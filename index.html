@@ -131,8 +131,8 @@ const CONFIG = {
   csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHiTyD5gNV9CDo8Cs72TyoBZJhbsSgMv-5cX1uDWPLfgMypeXKF_YImtk1gk10WqyPLV71EVI-7x5W/pub?gid=0&single=true&output=csv",  // Your published Google Sheet (CSV). Leave empty to preview with sample photos.
   formUrl: "",  // Google Form link. Leave empty to hide the Submit button.
   columns: {    // Right-hand side must match your Sheet headings (capitals don't matter).
-    title:"NAME", date:"DATE", by:"PHOTOGRAPHER", people:"PEOPLE", coll:"PROGRAM",
-    tags:"TAGS", notes:"NOTES", photo:"PHOTO LINK", status:"STATUS"
+    title:["TITLE","NAME"], date:"DATE", by:"PHOTOGRAPHER", people:"PEOPLE", coll:"PROGRAM",
+    tags:"TAGS", notes:"NOTES", source:"SOURCE", photo:"PHOTO LINK", status:"STATUS"
   },
   // Password screen. Leave "" to turn it off. To change the password, open the site with #makehash at the end of the address
   // (for example .../Rowe-photo-archive/#makehash), type a new password, and paste the code it shows here.
@@ -142,7 +142,7 @@ const CONFIG = {
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
-const F = [["title","Title"],["date","Date"],["by","Photographer"],["people","People"],["coll","Program"],["tags","Tags"],["notes","Notes"]];
+const F = [["title","Title"],["date","Date"],["by","Photographer"],["people","People"],["coll","Program"],["tags","Tags"],["notes","Notes"],["source","Source"]];
 const SORTABLE = F.filter(f => f[0] !== "notes");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let rows = [], order = [], cur = -1, demo = false;
@@ -188,7 +188,7 @@ async function load(){
   if(!CONFIG.csvUrl){demo=true;rows=sample();return start()}
   try{
     const res=await fetch(CONFIG.csvUrl);if(!res.ok)throw 0;
-    const t=parseCSV(await res.text()),head=t[0].map(h=>h.trim().toLowerCase()),C=CONFIG.columns,ix=k=>head.indexOf(C[k].toLowerCase());
+    const t=parseCSV(await res.text()),head=t[0].map(h=>h.trim().toLowerCase()),C=CONFIG.columns,ix=k=>{const i=[].concat(C[k]).map(n=>head.indexOf(n.toLowerCase())).find(i=>i>=0);return i===undefined?-1:i};
     rows=t.slice(1).filter(r=>r.some(x=>x)).map((r,i)=>{const o={id:i};
       F.forEach(f=>o[f[0]]=(r[ix(f[0])]||"").trim());o.date=isoDate(o.date);
       o.img=driveId(r[ix("photo")]);
@@ -262,7 +262,7 @@ function pane(r){const d=document.createElement("div");d.className="pane";
   pic.onmousemove=e=>{if(pic.classList.contains("z"))origin(e)};
   d.appendChild(pic);return d}
 function fillInfo(){const r=order[cur];$("ct").textContent=`${cur+1} of ${order.length}`;
-  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${F.slice(1,6).map(x=>`<dt>${x[1]}</dt><dd>${esc(r[x[0]]||"—")}</dd>`).join("")}</dl>${r.notes?`<p class="notes">${esc(r.notes)}</p>`:""}${r.img?`<a href="https://drive.google.com/file/d/${r.img}/view" target="_blank" rel="noopener">Open original in Drive</a>`:""}`}
+  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${F.filter(f=>f[0]!=="title"&&f[0]!=="notes").map(x=>`<dt>${x[1]}</dt><dd>${x[0]==="source"&&/^https?:\/\//i.test(r.source)?`<a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(r.source)}</a>`:esc(r[x[0]]||"—")}</dd>`).join("")}</dl>${r.notes?`<p class="notes">${esc(r.notes)}</p>`:""}`}
 function preload(){[1,-1].forEach(d=>{const p=new Image;p.src=src(order[nxt(d)],1800)})}
 function slide(cp,np,dir){busy=true;cur=nxt(dir);fillInfo();curP=np;
   const t=DUR(),w=W();void np.offsetWidth;
