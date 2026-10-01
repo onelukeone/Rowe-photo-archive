@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
 <title>Rowe Camp Photo Archive</title>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Fondamento&display=swap" rel="stylesheet">
 <style>
@@ -44,6 +45,16 @@ h2 small{font:500 15px var(--sans);letter-spacing:0;color:var(--mute)}
 .tile b{display:block;font:600 16px/1.15 var(--sans)}
 .tile i{font-size:13px;opacity:.85}
 .bad::before{content:"Photo unavailable\A Check Drive sharing";white-space:pre;position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--mute);font:500 13px var(--sans)}
+body.locked>*:not(#gate){display:none!important}
+.gate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
+.gate[hidden]{display:none}
+.gate .owl{width:min(260px,60vw)}
+.gate h1{white-space:normal;font-size:clamp(26px,6vw,46px);flex-basis:auto}
+.gate form{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.gate input{border:1px solid var(--line);background:transparent;border-radius:99px;padding:10px 18px;min-width:220px}
+.gate button{background:var(--acc);color:var(--acc-ink);border:0;border-radius:99px;padding:10px 22px;font:600 15px var(--sans);cursor:pointer}
+#gerr{color:#c0392b;min-height:1.4em;margin:0}
+#hres{max-width:60ch;word-break:break-all;font-size:14px}
 .msg{color:var(--mute);padding:50px 0;max-width:60ch;font-style:italic}
 footer{padding-top:40px;padding-bottom:40px;color:var(--mute);font-size:14px}
 /* viewer */
@@ -105,6 +116,13 @@ aside a{color:#9fb0ff}
 <div class="wrap status"><span id="count"></span><button class="clear" id="clear" hidden>Clear all filters</button></div>
 <main class="wrap" id="out"><p class="msg">Loading photos…</p></main>
 <footer class="wrap" id="foot"></footer>
+<div class="gate" id="gate" hidden>
+  <div class="owl" role="img" aria-label="Flying owl"></div>
+  <h1 id="gt">Rowe Camp Photo Archive</h1>
+  <form id="gform"><input id="pw" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password"><button type="submit">Enter</button></form>
+  <p id="gerr" role="alert"></p>
+  <p id="hres" hidden></p>
+</div>
 <dialog id="lb" aria-label="Photo viewer"></dialog>
 
 <script>
@@ -116,6 +134,9 @@ const CONFIG = {
     title:"NAME", date:"DATE", by:"PHOTOGRAPHER", people:"PEOPLE", coll:"PROGRAM",
     tags:"TAGS", notes:"NOTES", photo:"PHOTO LINK", status:"STATUS"
   },
+  // Password screen. Leave "" to turn it off. To change the password, open the site with #makehash at the end of the address
+  // (for example .../Rowe-photo-archive/#makehash), type a new password, and paste the code it shows here.
+  passwordHash: "9958399d48e55891f7977f35ee0ab03ec4b284f5e7a699ca04671b762a23e886",
   approvedValue: "Approved"
 };
 /* ========================================================= */
@@ -286,7 +307,25 @@ $("clear").onclick=()=>{st.q="";st.prog.clear();st.dec.clear();render()};
 $("out").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;openViewer(order.findIndex(r=>r.id==t.dataset.id));$("lb").showModal()};
 if(CONFIG.formUrl){$("addlink").href=CONFIG.formUrl;$("addlink").hidden=false}
 window.addEventListener("hashchange",()=>{readHash();if(rows.length)render()});
-load();
+const KEY="rowe-archive-ok";
+async function sha(t){if(!(window.crypto&&crypto.subtle))throw 0;
+  const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("rowe-archive:"+t));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function unlock(){document.body.classList.remove("locked");$("gate").hidden=true;load()}
+function boot(){
+  const h=CONFIG.passwordHash,helper=location.hash==="#makehash";
+  let ok=false;try{ok=!!h&&localStorage.getItem(KEY)===h}catch(e){}
+  if(!helper&&(!h||ok)){load();return}
+  document.body.classList.add("locked");$("gate").hidden=false;$("pw").focus();
+  if(helper){$("gt").textContent="Make a password code";$("pw").type="text";$("pw").placeholder="New password"}
+  $("gform").onsubmit=async e=>{e.preventDefault();$("gerr").textContent="";
+    try{const x=await sha($("pw").value);
+      if(helper){$("hres").hidden=false;$("hres").innerHTML="Paste this into <b>passwordHash</b> in index.html:<br><code></code>";$("hres").querySelector("code").textContent=x;return}
+      if(x===h){try{localStorage.setItem(KEY,h)}catch(e){}unlock()}
+      else{$("gerr").textContent="That password isn't right. Please try again.";$("pw").select()}
+    }catch(err){$("gerr").textContent="This browser can't check passwords here. Try opening the site over https."}};
+}
+boot();
 </script>
 </body>
 </html>
