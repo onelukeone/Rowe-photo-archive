@@ -43,7 +43,7 @@ h2 small{font:500 15px var(--sans);letter-spacing:0;color:var(--mute)}
 .tile:hover img{transform:scale(1.04)}
 .tile span{position:absolute;left:0;right:0;bottom:0;padding:28px 12px 10px;background:linear-gradient(transparent,rgba(8,12,16,.78));display:block}
 .tile b{display:block;font:600 13px/1.2 var(--sans)}
-.tile i{font-size:12px;opacity:.85}
+.tile i{font:500 13px var(--sans)}
 .bad::before{content:"Photo unavailable\A Check Drive sharing";white-space:pre;position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--mute);font:500 13px var(--sans)}
 body.locked>*:not(#gate){display:none!important}
 .gate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
@@ -242,7 +242,7 @@ function render(){
   const label=SORTABLE.find(f=>f[0]===st.sf)[1];
   $("out").innerHTML=list.length?[...groups].map(([g,items])=>
     (g?`<h2>${esc(g)}<small>${items.length}</small></h2>`:"")+`<div class="grid">`+items.map((r,i)=>
-    `<button class="tile" data-id="${r.id}"><img src="${src(r,700)}" data-id="${r.img||""}" data-w="700" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(r.title||"Untitled")}</b><i>${esc(sub(r))}</i></span></button>`).join("")+`</div>`).join("")
+    `<button class="tile" data-id="${r.id}" aria-label="${esc(r.title||"Photo")}"><img src="${src(r,700)}" data-id="${r.img||""}" data-w="700" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer">${sub(r)?`<span><i>${esc(sub(r))}</i></span>`:""}</button>`).join("")+`</div>`).join("")
     :'<p class="msg">No photos match these filters. Try removing a tag or clearing the search.</p>';
 }
 function start(){
