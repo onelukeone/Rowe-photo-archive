@@ -42,8 +42,8 @@ h2 small{font:500 15px var(--sans);letter-spacing:0;color:var(--mute)}
 .tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .35s}
 .tile:hover img{transform:scale(1.04)}
 .tile span{position:absolute;left:0;right:0;bottom:0;padding:28px 12px 10px;background:linear-gradient(transparent,rgba(8,12,16,.78));display:block}
-.tile b{display:block;font:600 16px/1.15 var(--sans)}
-.tile i{font-size:13px;opacity:.85}
+.tile b{display:block;font:600 13px/1.2 var(--sans)}
+.tile i{font-size:12px;opacity:.85}
 .bad::before{content:"Photo unavailable\A Check Drive sharing";white-space:pre;position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--mute);font:500 13px var(--sans)}
 body.locked>*:not(#gate){display:none!important}
 .gate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
@@ -101,7 +101,7 @@ aside a{color:#9fb0ff}
 
 <section class="wrap tb" aria-label="Search, sort and filter">
   <div class="row">
-    <input id="q" type="search" placeholder="Search title, people, notes" aria-label="Search">
+    <input id="q" type="search" placeholder="Search title, people, comments" aria-label="Search">
     <label class="lab" for="sf">Sort</label><select id="sf"></select>
     <button class="btn" id="dir"></button>
     <label class="lab" for="gf">Group</label><select id="gf"></select>
@@ -132,7 +132,7 @@ const CONFIG = {
   formUrl: "",  // Google Form link. Leave empty to hide the Submit button.
   columns: {    // Right-hand side must match your Sheet headings (capitals don't matter).
     title:["TITLE","NAME"], date:"DATE", by:"PHOTOGRAPHER", people:"PEOPLE", coll:"PROGRAM",
-    tags:"TAGS", notes:"NOTES", source:"SOURCE", photo:"PHOTO LINK", status:"STATUS"
+    tags:"TAGS", notes:["COMMENTS","NOTES"], era:"ERA", source:"SOURCE", photo:"PHOTO LINK", status:"STATUS"
   },
   // Password screen. Leave "" to turn it off. To change the password, open the site with #makehash at the end of the address
   // (for example .../Rowe-photo-archive/#makehash), type a new password, and paste the code it shows here.
@@ -142,13 +142,14 @@ const CONFIG = {
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
-const F = [["title","Title"],["date","Date"],["by","Photographer"],["people","People"],["coll","Program"],["tags","Tags"],["notes","Notes"],["source","Source"]];
+const F = [["title","Title"],["date","Date"],["era","Era"],["by","Photographer"],["people","People"],["coll","Program"],["tags","Tags"],["notes","Comments"],["source","Source"]];
 const SORTABLE = F.filter(f => f[0] !== "notes");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let rows = [], order = [], cur = -1, demo = false;
 const PROGS=["Senior High Camp","Junior High Camp","YPC","Other Youth Camps","Conferences","Rowe Center general"];
 const DECS=["1920s","1930s","1940s","1950s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
-const decOf=r=>/^\d{4}/.test(r.date)?r.date.slice(0,3)+"0s":"";
+const decOf=r=>{if(/^\d{4}/.test(r.date))return r.date.slice(0,3)+"0s";const m=(r.era||"").match(/^(\d{3})0s/i);return m?m[1]+"0s":""};
+const sub=r=>[r.date||r.era,r.coll].filter(Boolean).join(" - ");
 const st = {q:"", sf:"date", sd:1, gf:"", prog:new Set(), dec:new Set()};
 
 /* ---- data ---- */
@@ -210,7 +211,7 @@ function writeHash(){const p=new URLSearchParams();
 
 /* ---- render ---- */
 const tagsOf = r => r.tags.split(",").map(t=>t.trim().toLowerCase()).filter(Boolean);
-const val = (r,k) => k==="year"?r.date.slice(0,4):k==="decade"?decOf(r):(r[k]||"");
+const val = (r,k) => k==="year"?(r.date.slice(0,4)||r.era):k==="decade"?decOf(r):k==="date"?(r.date||r.era):(r[k]||"");
 const uniq = k => [...new Set(rows.map(r=>r[k]).filter(Boolean))].sort();
 const dirLabel = () => st.sf==="date"?(st.sd===1?"Oldest first":"Newest first"):(st.sd===1?"A to Z":"Z to A");
 
@@ -241,7 +242,7 @@ function render(){
   const label=SORTABLE.find(f=>f[0]===st.sf)[1];
   $("out").innerHTML=list.length?[...groups].map(([g,items])=>
     (g?`<h2>${esc(g)}<small>${items.length}</small></h2>`:"")+`<div class="grid">`+items.map((r,i)=>
-    `<button class="tile" data-id="${r.id}"><img src="${src(r,700)}" data-id="${r.img||""}" data-w="700" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(r.title||"Untitled")}</b><i>${esc(r[st.sf]||"No "+label.toLowerCase())}</i></span></button>`).join("")+`</div>`).join("")
+    `<button class="tile" data-id="${r.id}"><img src="${src(r,700)}" data-id="${r.img||""}" data-w="700" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer"><span><b>${esc(r.title||"Untitled")}</b><i>${esc(sub(r))}</i></span></button>`).join("")+`</div>`).join("")
     :'<p class="msg">No photos match these filters. Try removing a tag or clearing the search.</p>';
 }
 function start(){
@@ -262,7 +263,7 @@ function pane(r){const d=document.createElement("div");d.className="pane";
   pic.onmousemove=e=>{if(pic.classList.contains("z"))origin(e)};
   d.appendChild(pic);return d}
 function fillInfo(){const r=order[cur];$("ct").textContent=`${cur+1} of ${order.length}`;
-  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${F.filter(f=>f[0]!=="title"&&f[0]!=="notes").map(x=>`<dt>${x[1]}</dt><dd>${x[0]==="source"&&/^https?:\/\//i.test(r.source)?`<a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(r.source)}</a>`:esc(r[x[0]]||"—")}</dd>`).join("")}</dl>${r.notes?`<p class="notes">${esc(r.notes)}</p>`:""}`}
+  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${F.filter(f=>f[0]!=="title").map(x=>`<dt>${x[1]}</dt><dd>${x[0]==="source"&&/^https?:\/\//i.test(r.source)?`<a href="${esc(r.source)}" target="_blank" rel="noopener">${esc(r.source)}</a>`:esc(r[x[0]]||"—")}</dd>`).join("")}</dl>`}
 function preload(){[1,-1].forEach(d=>{const p=new Image;p.src=src(order[nxt(d)],1800)})}
 function slide(cp,np,dir){busy=true;cur=nxt(dir);fillInfo();curP=np;
   const t=DUR(),w=W();void np.offsetWidth;
