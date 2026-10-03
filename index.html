@@ -78,6 +78,15 @@ aside h3{font:800 34px/.95 var(--sans);letter-spacing:-.03em;margin:0 0 18px}
 aside dl{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:0 0 18px;font-size:15px}
 aside dt{color:#9aa4af;font:500 13px var(--sans);padding-top:2px}
 aside dd{margin:0;overflow-wrap:anywhere}
+.sg{margin-top:20px;border-top:1px solid #2b333b;padding-top:14px}
+.sg summary{cursor:pointer;font:600 14px var(--sans);color:#9fb0ff}
+.sg label{display:block;font:500 13px var(--sans);color:#9aa4af;margin:12px 0 4px}
+.sg input[type=text]{width:100%;background:#161c21;color:#eceff3;border:1px solid #2b333b;border-radius:8px;padding:9px 10px;font:15px var(--serif)}
+.sg .hint{font-size:13px;color:#9aa4af;margin:4px 0 0}
+.sg button{margin-top:12px;background:#9fb0ff;color:#0c1014;border:0;border-radius:99px;padding:9px 18px;font:600 14px var(--sans);cursor:pointer}
+.sg button:disabled{opacity:.6}
+.sgm{min-height:1.3em;font-size:14px;margin:8px 0 0}
+.hp{position:absolute;left:-9999px}
 aside a{color:#9fb0ff}
 .cm{margin-top:22px;border-top:1px solid #2b333b;padding-top:16px}
 .cm h4{font:600 13px var(--sans);color:#9aa4af;margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em}
@@ -149,6 +158,9 @@ const CONFIG = {
   contribPhotoEntry: "",  // The Form's "Photo ID" entry code, like entry.1234567890
   contribTitleEntry: "",  // Optional: the "Photo title" entry code, like entry.2345678901
   contribColumns: { photo:"Photo ID", name:"Your name", text:"Your comment", when:"Timestamp", status:"STATUS" },
+  // Suggest people or tags (optional). Leave suggestFormUrl "" to turn this off.
+  suggestFormUrl: "",   // The Form's address, ending in /viewform
+  suggestEntries: { photo:"", title:"", people:"", tags:"", name:"" },  // Entry codes, like "entry.1234567890" (title and name are optional)
   approvedValue: "Approved"
 };
 /* ========================================================= */
@@ -292,10 +304,18 @@ function addLink(r){const u=CONFIG.contribFormUrl,e=CONFIG.contribPhotoEntry;if(
   let q="?usp=pp_url&"+encodeURIComponent(e)+"="+encodeURIComponent(r.img);
   if(CONFIG.contribTitleEntry)q+="&"+encodeURIComponent(CONFIG.contribTitleEntry)+"="+encodeURIComponent(r.title||"");
   return `<a class="addk" href="${esc(u+q)}" target="_blank" rel="noopener">Add what you know</a>`}
+function suggestHTML(r){if(!CONFIG.suggestFormUrl||!r.img)return "";
+  return `<details class="sg"><summary>Suggest people or tags</summary><form class="sgf" novalidate>
+<label for="sgp">Who is in this photo?</label><input type="text" id="sgp" name="people" placeholder="First Last, First Last" autocomplete="off">
+<p class="hint">Separate names with commas.</p>
+<label for="sgt">Other tags</label><input type="text" id="sgt" name="tags" placeholder="canoeing, chapel, dinner" autocomplete="off">
+<label for="sgn">Your name (optional)</label><input type="text" id="sgn" name="who" autocomplete="name">
+<input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<button type="submit">Send suggestion</button><p class="sgm" role="status"></p></form></details>`}
 function contribHTML(r){const c=r.contribs||[],a=addLink(r);if(!c.length&&!a)return "";
   return `<div class="cm"><h4>Added by visitors</h4>${c.length?c.map(x=>`<blockquote>${esc(x.text)}<cite>${esc([x.name||"Anonymous",whenTxt(x.when)].filter(Boolean).join(", "))}</cite></blockquote>`).join(""):'<p class="none">Nothing added yet.</p>'}${a}</div>`}
 function fillInfo(){const r=order[cur];$("ct").textContent=`${cur+1} of ${order.length}`;
-  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${detail(r)}</dl>${contribHTML(r)}`}
+  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${detail(r)}</dl>${contribHTML(r)}${suggestHTML(r)}`}
 function preload(){[1,-1].forEach(d=>{const p=new Image;p.src=src(order[nxt(d)],1800)})}
 function slide(cp,np,dir){busy=true;cur=nxt(dir);fillInfo();curP=np;
   const t=DUR(),w=W();void np.offsetWidth;
@@ -325,7 +345,7 @@ function openViewer(i){cur=i;busy=false;nb=null;dragging=false;tracking=false;
       if(n){n.style.transition=`transform ${t}ms ease`;n.style.transform=`translateX(${nbDir*w}px)`;setTimeout(()=>n.remove(),t+30)}}};
   sg.addEventListener("touchend",end);sg.addEventListener("touchcancel",end);
 }
-document.addEventListener("keydown",e=>{if(!$("lb").open)return;
+document.addEventListener("keydown",e=>{if(!$("lb").open||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;
   if(e.key==="ArrowRight")go(1);else if(e.key==="ArrowLeft")go(-1);else if(e.key==="i")$("ib").click()});
 
 /* ---- controls ---- */
@@ -340,6 +360,22 @@ $("clear").onclick=()=>{st.q="";st.prog.clear();st.dec.clear();render()};
 $("out").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;openViewer(order.findIndex(r=>r.id==t.dataset.id));$("lb").showModal()};
 if(CONFIG.formUrl){$("addlink").href=CONFIG.formUrl;$("addlink").hidden=false}
 window.addEventListener("hashchange",()=>{readHash();if(rows.length)render()});
+$("lb").addEventListener("submit",async e=>{
+  const f=e.target;if(!f.classList||!f.classList.contains("sgf"))return;
+  e.preventDefault();
+  const r=order[cur],E=CONFIG.suggestEntries,msg=f.querySelector(".sgm"),btn=f.querySelector("button"),v=n=>f.elements[n].value.trim();
+  if(v("website"))return;
+  if(!E.photo||!E.people||!E.tags){msg.textContent="Suggestions aren't set up yet.";return}
+  if(!v("people")&&!v("tags")){msg.textContent="Please add at least one name or tag.";return}
+  btn.disabled=true;msg.textContent="Sending…";
+  const body=new URLSearchParams();
+  body.set(E.photo,r.img);body.set(E.people,v("people"));body.set(E.tags,v("tags"));
+  if(E.title)body.set(E.title,r.title||r.file||"");
+  if(E.name&&v("who"))body.set(E.name,v("who"));
+  try{await fetch(CONFIG.suggestFormUrl.replace(/\/viewform.*$/,"/formResponse"),{method:"POST",mode:"no-cors",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
+    f.reset();msg.textContent="Thank you! Your suggestion will appear after it has been reviewed."}
+  catch(err){msg.textContent="Sorry, that didn't send. Please try again."}
+  btn.disabled=false});
 const KEY="rowe-archive-ok";
 async function sha(t){if(!(window.crypto&&crypto.subtle))throw 0;
   const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("rowe-archive:"+t));
