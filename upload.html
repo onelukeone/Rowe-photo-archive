@@ -30,10 +30,18 @@ textarea{min-height:110px;resize:vertical}
 .drop:hover{border-color:var(--acc)}
 .drop input{position:absolute;opacity:0;width:1px;height:1px}
 .drop:focus-within{outline:3px solid var(--acc);outline-offset:2px}
-ul{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
-li{position:relative}
-li img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;display:block}
-li button{position:absolute;top:4px;right:4px;border:0;border-radius:99px;width:26px;height:26px;background:rgba(0,0,0,.65);color:#fff;font-size:16px;cursor:pointer;line-height:1}
+ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
+.card{position:relative;display:grid;grid-template-columns:100px 1fr;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.card img{width:100px;height:100px;object-fit:cover;border-radius:8px;display:block}
+.card .fname{margin:2px 34px 4px 0;font:600 14px var(--sans);overflow-wrap:anywhere}
+.card summary{cursor:pointer;color:var(--acc);font:500 14px var(--sans)}
+.card label{margin:12px 0 4px;font-size:13px}
+.card textarea{min-height:70px}
+.card .rm{position:absolute;top:8px;right:8px;border:0;border-radius:99px;width:28px;height:28px;background:rgba(0,0,0,.65);color:#fff;font-size:17px;cursor:pointer;line-height:1}
+.card .cp{margin-top:14px;padding:8px 16px;font-size:14px}
+.pf{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.pf .full{grid-column:1/-1}
+@media(max-width:560px){.pf{grid-template-columns:1fr}.card{grid-template-columns:76px 1fr}.card img{width:76px;height:76px}}
 .check{display:flex;gap:10px;align-items:flex-start;margin:22px 0 0;font:400 15px var(--serif)}
 .check input{margin-top:5px;flex:none}
 .msg{min-height:1.5em;margin:14px 0 0;font:500 15px var(--sans)}
@@ -69,7 +77,9 @@ li button{position:absolute;top:4px;right:4px;border:0;border-radius:99px;width:
     <label class="drop" for="files">Tap or click to choose photos (up to 10)
       <input type="file" id="files" accept="image/*" multiple></label>
     <ul id="list" aria-label="Chosen photos"></ul>
+    <p class="hint" id="multihint" hidden></p>
 
+    <div id="shared">
     <label for="date">Date or era <span class="opt">(if known)</span></label>
     <input type="text" id="date" placeholder="1992, June 1992, or 1980s">
     <p class="hint">A year, a month and year, or a decade if you are unsure.</p>
@@ -89,6 +99,7 @@ li button{position:absolute;top:4px;right:4px;border:0;border-radius:99px;width:
 
     <label for="title">Title <span class="opt">(optional)</span></label>
     <input type="text" id="title">
+    </div>
 
     <label class="check"><input type="checkbox" id="rights" required>
       <span>I took this photo or have permission to share it, and I understand it may be shown in the archive. *</span></label>
@@ -114,7 +125,7 @@ const MAX_SIDE = 2800;   // photos are shrunk to this many pixels on the longest
 /* ================================= */
 
 const $ = id => document.getElementById(id);
-let PW = "", queue = [];
+let PW = "", queue = [], wasMulti = false;
 
 async function api(action, payload) {
   let res;
@@ -138,18 +149,65 @@ $("gate").onsubmit = async e => {
 $("files").onchange = e => {
   for (const f of e.target.files) {
     if (queue.length >= MAX_FILES) { $("status").textContent = "You can send up to " + MAX_FILES + " photos at a time."; break; }
-    if (f.type.startsWith("image/")) queue.push(f);
+    if (f.type.startsWith("image/")) queue.push({ file: f, title: "", date: "", program: "", people: "", tags: "", comments: "", open: false });
   }
   e.target.value = ""; render();
 };
+const DETAIL_KEYS = ["title", "date", "program", "people", "tags", "comments"];
+function sharedGet() { const o = {}; DETAIL_KEYS.forEach(k => { o[k] = $(k).value; }); return o; }
+function sharedSet(o) { DETAIL_KEYS.forEach(k => { $(k).value = o[k] || ""; }); }
+
+// Copies one photo's details (everything except the title) onto every other photo
+const COPY_KEYS = ["date", "program", "people", "tags", "comments"];
+function copyToAll(src) {
+  const others = queue.filter(x => x !== src);
+  if (!others.length) return;
+  if (others.some(o => COPY_KEYS.some(k => String(o[k]).trim())) && !confirm("This replaces the details already typed on the other photos. Continue?")) return;
+  others.forEach(o => COPY_KEYS.forEach(k => { o[k] = src[k]; }));
+  render();
+  const st = $("status"); st.className = "msg"; st.textContent = "Copied to " + others.length + " other photo" + (others.length === 1 ? "" : "s") + ". The titles were left as they were.";
+}
+
 function render() {
+  const multi = queue.length > 1;
+  // Carry typed answers across when the number of photos goes from one to several, or back to one
+  if (multi && !wasMulti) { const sh = sharedGet(); DETAIL_KEYS.forEach(k => { queue[0][k] = sh[k]; }); sharedSet({}); }
+  else if (!multi && wasMulti && queue.length === 1) sharedSet(queue[0]);
+  wasMulti = multi;
+  $("shared").hidden = multi;
+  const mh = $("multihint"); mh.hidden = !multi;
+  mh.textContent = "You've chosen several photos, so each one has its own details. Anything you leave blank stays blank for that photo.";
+
   const ul = $("list"); ul.innerHTML = "";
-  queue.forEach((f, i) => {
-    const li = document.createElement("li"), im = new Image(), b = document.createElement("button");
-    im.src = URL.createObjectURL(f); im.alt = f.name;
-    b.type = "button"; b.textContent = "\u00d7"; b.setAttribute("aria-label", "Remove " + f.name);
+  queue.forEach((it, i) => {
+    const li = document.createElement("li"); li.className = "card";
+    const im = new Image(); im.src = URL.createObjectURL(it.file); im.alt = "";
+    const body = document.createElement("div");
+    const nm = document.createElement("p"); nm.className = "fname"; nm.textContent = it.file.name;
+    body.appendChild(nm);
+    if (multi) {
+      const pf = document.createElement("div"); pf.className = "pf";
+      [["title", "Title (optional)", "input"], ["date", "Date or era (if known)", "input"], ["program", "Program (if known)", "select"],
+       ["tags", "Other tags", "input"], ["people", "People in the photo (if known)", "input", "full"], ["comments", "Comments or further description", "textarea", "full"]
+      ].forEach(([k, label, tag, cls]) => {
+        const w = document.createElement("div"); w.className = "fw" + (cls ? " " + cls : "");
+        const id = "pp" + i + k, lb = document.createElement("label"); lb.htmlFor = id; lb.textContent = label;
+        const fld = document.createElement(tag); fld.id = id; if (tag === "input") fld.type = "text";
+        if (tag === "select") { fld.add(new Option("Not sure or not applicable", "")); PROGRAMS.forEach(p => fld.add(new Option(p, p))); }
+        fld.value = it[k];
+        fld.oninput = fld.onchange = () => { it[k] = fld.value; };
+        w.append(lb, fld); pf.appendChild(w);
+      });
+      body.appendChild(pf);
+      const cp = document.createElement("button"); cp.type = "button"; cp.className = "btn alt cp";
+      cp.textContent = "Copy these details to all other photos";
+      cp.onclick = () => copyToAll(it);
+      body.appendChild(cp);
+    }
+    const b = document.createElement("button"); b.type = "button"; b.className = "rm"; b.textContent = "\u00d7";
+    b.setAttribute("aria-label", "Remove " + it.file.name);
     b.onclick = () => { queue.splice(i, 1); render(); };
-    li.append(im, b); ul.appendChild(li);
+    li.append(im, body, b); ul.appendChild(li);
   });
 }
 function shrink(file) {
@@ -168,6 +226,13 @@ function shrink(file) {
   });
 }
 
+function perPhoto(base, it, multi) {
+  if (!multi) return base;
+  const t = k => String(it[k] || "").trim();
+  return { name: base.name, email: base.email, rights: base.rights,
+           title: t("title"), date: t("date"), program: t("program"), people: t("people"), tags: t("tags"), comments: t("comments") };
+}
+
 $("main").onsubmit = async e => {
   e.preventDefault();
   const st = $("status"); st.className = "msg"; st.textContent = "";
@@ -175,13 +240,13 @@ $("main").onsubmit = async e => {
   const meta = { name: $("name").value, email: $("email").value, date: $("date").value, program: $("program").value,
     people: $("people").value, tags: $("tags").value, comments: $("comments").value, title: $("title").value, rights: $("rights").checked };
   $("send").disabled = true;
-  const total = queue.length; let done = 0;
+  const total = queue.length, multi = total > 1; let done = 0;
   try {
     while (queue.length) {
-      const f = queue[0];
+      const it = queue[0], f = it.file;
       st.textContent = "Uploading " + (done + 1) + " of " + total + "\u2026";
       const data = await shrink(f);
-      await api("upload", { password: PW, meta, file: { name: f.name.replace(/\.[^.]+$/, "") + ".jpg", data } });
+      await api("upload", { password: PW, meta: perPhoto(meta, it, multi), file: { name: f.name.replace(/\.[^.]+$/, "") + ".jpg", data } });
       queue.shift(); done++; render();
     }
     await api("finish", { password: PW, meta, count: done });
