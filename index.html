@@ -81,7 +81,8 @@ aside dd{margin:0;overflow-wrap:anywhere}
 .sg{margin-top:20px;border-top:1px solid #2b333b;padding-top:14px}
 .sg summary{cursor:pointer;font:600 14px var(--sans);color:#9fb0ff}
 .sg label{display:block;font:500 13px var(--sans);color:#9aa4af;margin:12px 0 4px}
-.sg input[type=text]{width:100%;background:#161c21;color:#eceff3;border:1px solid #2b333b;border-radius:8px;padding:9px 10px;font:15px var(--serif)}
+.sg textarea,.sg select,.sg input[type=email],.sg input[type=password],.sg input[type=text]{width:100%;background:#161c21;color:#eceff3;border:1px solid #2b333b;border-radius:8px;padding:9px 10px;font:15px var(--serif)}
+.sg textarea{min-height:70px;resize:vertical}
 .sg .hint{font-size:13px;color:#9aa4af;margin:4px 0 0}
 .sg button{margin-top:12px;background:#9fb0ff;color:#0c1014;border:0;border-radius:99px;padding:9px 18px;font:600 14px var(--sans);cursor:pointer}
 .sg button:disabled{opacity:.6}
@@ -158,9 +159,8 @@ const CONFIG = {
   contribPhotoEntry: "",  // The Form's "Photo ID" entry code, like entry.1234567890
   contribTitleEntry: "",  // Optional: the "Photo title" entry code, like entry.2345678901
   contribColumns: { photo:"Photo ID", name:"Your name", text:"Your comment", when:"Timestamp", status:"STATUS" },
-  // Suggest people or tags (optional). Leave suggestFormUrl "" to turn this off.
-  suggestFormUrl: "",   // The Form's address, ending in /viewform
-  suggestEntries: { photo:"", title:"", people:"", tags:"", name:"" },  // Entry codes, like "entry.1234567890" (title and name are optional)
+  // Suggest a change or add information (optional). Uses the same Apps Script web app as the upload page. Leave "" to turn this off.
+  suggestApiUrl: "https://script.google.com/macros/s/AKfycbxkwkozQwDOW6YYDhqsVArnDQfMgXAyCMSZ-lf1xeY-LzL4O4CHG2QGyrOE-gnjHQ/exec",
   approvedValue: "Approved"
 };
 /* ========================================================= */
@@ -304,12 +304,23 @@ function addLink(r){const u=CONFIG.contribFormUrl,e=CONFIG.contribPhotoEntry;if(
   let q="?usp=pp_url&"+encodeURIComponent(e)+"="+encodeURIComponent(r.img);
   if(CONFIG.contribTitleEntry)q+="&"+encodeURIComponent(CONFIG.contribTitleEntry)+"="+encodeURIComponent(r.title||"");
   return `<a class="addk" href="${esc(u+q)}" target="_blank" rel="noopener">Add what you know</a>`}
-function suggestHTML(r){if(!CONFIG.suggestFormUrl||!r.img)return "";
-  return `<details class="sg"><summary>Suggest people or tags</summary><form class="sgf" novalidate>
-<label for="sgp">Who is in this photo?</label><input type="text" id="sgp" name="people" placeholder="First Last, First Last" autocomplete="off">
-<p class="hint">Separate names with commas.</p>
-<label for="sgt">Other tags</label><input type="text" id="sgt" name="tags" placeholder="canoeing, chapel, dinner" autocomplete="off">
-<label for="sgn">Your name (optional)</label><input type="text" id="sgn" name="who" autocomplete="name">
+function suggestHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
+  const cur=r.date||r.era||"",progs=(!r.coll||PROGS.includes(r.coll))?PROGS:PROGS.concat(r.coll);
+  const f=(k,l,v,ph)=>`<label for="sg_${k}">${l}</label><input type="text" id="sg_${k}" name="${k}" value="${esc(v)}" data-orig="${esc(v)}" placeholder="${esc(ph||"")}" autocomplete="off">`;
+  return `<details class="sg"><summary>Suggest a change or add information</summary><form class="sgf" novalidate>
+<p class="hint">Fix anything that looks wrong, or add what you know. Suggestions are reviewed before they appear.</p>
+${f("title","Title",r.title)}
+${f("date","Date or era",cur,"1992, June 1992, or 1980s")}
+<label for="sg_program">Program</label><select id="sg_program" name="program" data-orig="${esc(r.coll)}"><option value=""${r.coll?"":" selected"}>Not set</option>${progs.map(p=>`<option${p===r.coll?" selected":""}>${esc(p)}</option>`).join("")}</select>
+${f("people","People in the photo",r.people,"First Last, First Last")}
+${f("tags","Tags",r.tags,"canoeing, chapel, dinner")}
+<label for="sg_info">Add information about this photo</label><textarea id="sg_info" name="info" placeholder="Who, what, where, when, or any story behind the photo."></textarea>
+<p class="hint">This is added to the photo's comments.</p>
+<label for="sg_note">Note to the editors (not shown on the site)</label><textarea id="sg_note" name="note" placeholder="Something wrong, or something to remove? Tell us here."></textarea>
+<label for="sg_name">Your name *</label><input type="text" id="sg_name" name="who" autocomplete="name">
+<label for="sg_email">Your email address *</label><input type="email" id="sg_email" name="email" autocomplete="email">
+<p class="hint">Kept privately. It is not shown on the site.</p>
+${pwSaved()?"":'<label for="sg_pw">Archive password *</label><input type="password" id="sg_pw" name="pw" autocomplete="current-password">'}
 <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
 <button type="submit">Send suggestion</button><p class="sgm" role="status"></p></form></details>`}
 function contribHTML(r){const c=r.contribs||[],a=addLink(r);if(!c.length&&!a)return "";
@@ -360,22 +371,34 @@ $("clear").onclick=()=>{st.q="";st.prog.clear();st.dec.clear();render()};
 $("out").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;openViewer(order.findIndex(r=>r.id==t.dataset.id));$("lb").showModal()};
 if(CONFIG.formUrl){$("addlink").href=CONFIG.formUrl;$("addlink").hidden=false}
 window.addEventListener("hashchange",()=>{readHash();if(rows.length)render()});
+const pwSaved=()=>{try{return sessionStorage.getItem("rowe-pw")||""}catch(e){return ""}};
+async function api(action,payload){
+  let res;
+  try{res=await fetch(CONFIG.suggestApiUrl,{method:"POST",body:JSON.stringify(Object.assign({action},payload))})}
+  catch(e){throw new Error("Couldn't reach the server. Please check your connection and try again.")}
+  let out;try{out=await res.json()}catch(e){throw new Error("The server sent an unexpected reply. Please try again later.")}
+  if(!out.ok)throw new Error(out.error||"Something went wrong.");
+  return out}
 $("lb").addEventListener("submit",async e=>{
   const f=e.target;if(!f.classList||!f.classList.contains("sgf"))return;
   e.preventDefault();
-  const r=order[cur],E=CONFIG.suggestEntries,msg=f.querySelector(".sgm"),btn=f.querySelector("button"),v=n=>f.elements[n].value.trim();
+  const r=order[cur],msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),el=n=>f.elements[n],v=n=>el(n)?el(n).value.trim():"";
   if(v("website"))return;
-  if(!E.photo||!E.people||!E.tags){msg.textContent="Suggestions aren't set up yet.";return}
-  if(!v("people")&&!v("tags")){msg.textContent="Please add at least one name or tag.";return}
+  const s={photoId:r.img,name:v("who"),email:v("email"),info:v("info"),note:v("note")},cleared=[];
+  ["title","date","program","people","tags"].forEach(k=>{
+    const o=(el(k).dataset.orig||"").trim(),n=v(k);
+    if(n===o)s[k]="";else if(n===""){s[k]="";cleared.push(k+" (was: "+o+")")}else s[k]=n});
+  if(cleared.length)s.note=(s.note?s.note+"\n":"")+"Visitor cleared: "+cleared.join("; ");
+  if(!s.title&&!s.date&&!s.program&&!s.people&&!s.tags&&!s.info&&!s.note){msg.textContent="Nothing has been changed yet.";return}
+  if(!s.name){msg.textContent="Please enter your name.";return}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.email)){msg.textContent="Please enter a valid email address.";return}
+  const pw=pwSaved()||v("pw");
+  if(!pw){msg.textContent="Please enter the archive password.";return}
   btn.disabled=true;msg.textContent="Sending…";
-  const body=new URLSearchParams();
-  body.set(E.photo,r.img);body.set(E.people,v("people"));body.set(E.tags,v("tags"));
-  if(E.title)body.set(E.title,r.title||r.file||"");
-  if(E.name&&v("who"))body.set(E.name,v("who"));
-  try{await fetch(CONFIG.suggestFormUrl.replace(/\/viewform.*$/,"/formResponse"),{method:"POST",mode:"no-cors",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
-    f.reset();msg.textContent="Thank you! Your suggestion will appear after it has been reviewed."}
-  catch(err){msg.textContent="Sorry, that didn't send. Please try again."}
-  btn.disabled=false});
+  try{await api("suggest",{password:pw,suggestion:s});
+    try{sessionStorage.setItem("rowe-pw",pw)}catch(err){}
+    f.innerHTML='<p class="sgm">Thank you! Your suggestion will appear after it has been reviewed.</p>'}
+  catch(err){msg.textContent=err.message;btn.disabled=false}});
 const KEY="rowe-archive-ok";
 async function sha(t){if(!(window.crypto&&crypto.subtle))throw 0;
   const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("rowe-archive:"+t));
@@ -390,7 +413,7 @@ function boot(){
   $("gform").onsubmit=async e=>{e.preventDefault();$("gerr").textContent="";
     try{const x=await sha($("pw").value);
       if(helper){$("hres").hidden=false;$("hres").innerHTML="Paste this into <b>passwordHash</b> in index.html:<br><code></code>";$("hres").querySelector("code").textContent=x;return}
-      if(x===h){try{localStorage.setItem(KEY,h)}catch(e){}unlock()}
+      if(x===h){try{localStorage.setItem(KEY,h);sessionStorage.setItem("rowe-pw",$("pw").value)}catch(e){}unlock()}
       else{$("gerr").textContent="That password isn't right. Please try again.";$("pw").select()}
     }catch(err){$("gerr").textContent="This browser can't check passwords here. Try opening the site over https."}};
 }
