@@ -77,6 +77,8 @@ ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
       <div><label for="email">Your email address *</label><input type="email" id="email" autocomplete="email" required>
         <p class="hint">Kept privately. It is not shown on the site.</p></div>
     </div>
+    <label class="check"><input type="checkbox" id="remember" checked>
+      <span>Remember my name and email on this device. <a href="#" id="forget">Clear saved details</a></span></label>
 
     <span class="lab">Photo(s) *</span>
     <label class="drop" for="files">Tap or click to choose photos (up to 10)
@@ -178,6 +180,10 @@ async function loadTags(){
       String(r[ti]||"").split(",").forEach(x=>{x=x.trim();if(!x)return;const k=x.toLowerCase(),e=c.get(k)||{n:0,f:{}};e.n++;e.f[x]=(e.f[x]||0)+1;c.set(k,e)})});
     TAGPOOL=[...c.values()].sort((a,b)=>b.n-a.n).map(e=>Object.entries(e.f).sort((a,b)=>b[1]-a[1])[0][0])}catch(e){}}
 let PW = "", queue = [], wasMulti = false;
+const ID_KEY = "rowe-visitor";
+function getId() { try { const o = JSON.parse(localStorage.getItem(ID_KEY) || "null"); return o && o.name && o.email ? o : null; } catch (e) { return null; } }
+(function () { const i = getId(); if (i) { $("name").value = i.name; $("email").value = i.email; } })();
+$("forget").onclick = e => { e.preventDefault(); try { localStorage.removeItem(ID_KEY); } catch (err) {} $("name").value = ""; $("email").value = ""; $("remember").checked = false; };
 
 async function api(action, payload) {
   let res;
@@ -303,6 +309,7 @@ $("main").onsubmit = async e => {
       queue.shift(); done++; render();
     }
     await api("finish", { password: PW, meta, count: done });
+    try { if ($("remember").checked) localStorage.setItem(ID_KEY, JSON.stringify({ name: meta.name.trim(), email: meta.email.trim() })); else localStorage.removeItem(ID_KEY); } catch (err) {}
     $("main").hidden = true; $("thanks").hidden = false;
     $("tmsg").textContent = done + (done === 1 ? " photo was" : " photos were") + " received. It will appear in the archive after it has been reviewed.";
   } catch (err) {

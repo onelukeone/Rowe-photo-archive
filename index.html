@@ -88,6 +88,9 @@ aside dd{margin:0;overflow-wrap:anywhere}
 .sg label{display:block;font:500 13px var(--sans);color:#9aa4af;margin:12px 0 4px}
 .sg textarea,.sg select,.sg input[type=email],.sg input[type=password],.sg input[type=text]{width:100%;background:#161c21;color:#eceff3;border:1px solid #2b333b;border-radius:8px;padding:9px 10px;font:15px var(--serif)}
 .sg textarea{min-height:70px;resize:vertical}
+.sg button.lnk{background:none;color:#9fb0ff;padding:0;margin:0 0 0 6px;border-radius:0;text-decoration:underline;font:500 14px var(--sans)}
+.sg .who{font-size:15px;margin:14px 0 0}
+.sg label.chk{display:flex;gap:8px;align-items:center;margin:12px 0 0}
 .sg .hint{font-size:13px;color:#9aa4af;margin:4px 0 0}
 .sg button{margin-top:12px;background:#9fb0ff;color:#0c1014;border:0;border-radius:99px;padding:9px 18px;font:600 14px var(--sans);cursor:pointer}
 .sg button:disabled{opacity:.6}
@@ -350,6 +353,17 @@ function addLink(r){const u=CONFIG.contribFormUrl,e=CONFIG.contribPhotoEntry;if(
   let q="?usp=pp_url&"+encodeURIComponent(e)+"="+encodeURIComponent(r.img);
   if(CONFIG.contribTitleEntry)q+="&"+encodeURIComponent(CONFIG.contribTitleEntry)+"="+encodeURIComponent(r.title||"");
   return `<a class="addk" href="${esc(u+q)}" target="_blank" rel="noopener">Add what you know</a>`}
+/* ---- remember who is sending, on this device only ---- */
+const ID_KEY="rowe-visitor";
+function getId(){try{const o=JSON.parse(localStorage.getItem(ID_KEY)||"null");return o&&o.name&&o.email?o:null}catch(e){return null}}
+function setId(name,email){try{localStorage.setItem(ID_KEY,JSON.stringify({name,email}))}catch(e){}}
+function clearId(){try{localStorage.removeItem(ID_KEY)}catch(e){}}
+function idFields(){return `<label for="sg_name">Your name *</label><input type="text" id="sg_name" name="who" autocomplete="name">
+<label for="sg_email">Your email address *</label><input type="email" id="sg_email" name="email" autocomplete="email">
+<p class="hint">Kept privately. It is not shown on the site.</p>
+<label class="chk"><input type="checkbox" name="remember" checked> Remember my name and email on this device</label>`}
+function idHTML(){const i=getId();
+  return i?`<p class="who">Sending as <b>${esc(i.name)}</b> (${esc(i.email)}) <button type="button" class="lnk" id="sg_chg">Not you?</button></p><input type="hidden" name="who" value="${esc(i.name)}"><input type="hidden" name="email" value="${esc(i.email)}">`:idFields()}
 function suggestHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
   const cur=r.date||r.era||"",progs=(!r.coll||PROGS.includes(r.coll))?PROGS:PROGS.concat(r.coll);
   const f=(k,l,v,ph)=>`<label for="sg_${k}">${l}</label><input type="text" id="sg_${k}" name="${k}" value="${esc(v)}" data-orig="${esc(v)}" placeholder="${esc(ph||"")}" autocomplete="off">`;
@@ -363,9 +377,7 @@ ${f("tags","Tags",r.tags,"canoeing, chapel, dinner")}
 <label for="sg_info">Add information about this photo</label><textarea id="sg_info" name="info" placeholder="Who, what, where, when, or any story behind the photo."></textarea>
 <p class="hint">This is added to the photo's comments.</p>
 <label for="sg_note">Note to the editors (not shown on the site)</label><textarea id="sg_note" name="note" placeholder="Something wrong, or something to remove? Tell us here."></textarea>
-<label for="sg_name">Your name *</label><input type="text" id="sg_name" name="who" autocomplete="name">
-<label for="sg_email">Your email address *</label><input type="email" id="sg_email" name="email" autocomplete="email">
-<p class="hint">Kept privately. It is not shown on the site.</p>
+<div id="sg_id">${idHTML()}</div>
 ${pwSaved()?"":'<label for="sg_pw">Archive password *</label><input type="password" id="sg_pw" name="pw" autocomplete="current-password">'}
 <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
 <button type="submit">Send suggestion</button><p class="sgm" role="status"></p></form></details>`}
@@ -482,8 +494,12 @@ $("lb").addEventListener("submit",async e=>{
   btn.disabled=true;msg.textContent="Sending…";
   try{await api("suggest",{password:pw,suggestion:s});
     try{sessionStorage.setItem("rowe-pw",pw)}catch(err){}
-    f.innerHTML='<p class="sgm">Thank you! Your suggestion will appear after it has been reviewed.</p>'}
+    const rm=el("remember");if(!getId()&&rm&&rm.checked)setId(s.name,s.email);
+    f.innerHTML='<p class="sgm">Thank you! Your suggestion will appear after it has been reviewed.</p><button type="button" id="sg_again">Suggest another change</button>'}
   catch(err){msg.textContent=err.message;btn.disabled=false}});
+$("lb").addEventListener("click",e=>{
+  if(e.target.id==="sg_chg"){clearId();$("sg_id").innerHTML=idFields();$("sg_name").focus()}
+  else if(e.target.id==="sg_again"){fillInfo();const d=$("side").querySelector(".sg");if(d){d.open=true;d.scrollIntoView({block:"nearest"})}}});
 const KEY="rowe-archive-ok";
 async function sha(t){if(!(window.crypto&&crypto.subtle))throw 0;
   const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("rowe-archive:"+t));
