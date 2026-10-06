@@ -88,6 +88,28 @@ aside dd{margin:0;overflow-wrap:anywhere}
 .sg label{display:block;font:500 13px var(--sans);color:#9aa4af;margin:12px 0 4px}
 .sg textarea,.sg select,.sg input[type=email],.sg input[type=password],.sg input[type=text]{width:100%;background:#161c21;color:#eceff3;border:1px solid #2b333b;border-radius:8px;padding:9px 10px;font:15px var(--serif)}
 .sg textarea{min-height:70px;resize:vertical}
+.disc{margin-top:22px;border-top:1px solid #2b333b;padding-top:16px}
+.disc h4{font:600 13px var(--sans);color:#9aa4af;margin:0 0 12px;text-transform:uppercase;letter-spacing:.06em}
+.dm{margin:0 0 12px;padding:10px 12px;background:#161c21;border:1px solid #2b333b;border-radius:10px}
+.dm header{display:flex;justify-content:space-between;gap:10px;font:500 13px var(--sans);color:#9aa4af;margin-bottom:4px}
+.dm header b{color:#eceff3;font-weight:600}
+.dm p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.dm.reply{background:transparent;margin:0 0 8px;padding:8px 12px}
+.replies{margin:-4px 0 12px 14px;padding-left:12px;border-left:2px solid #2b333b}
+.dm .rbtn{background:none;border:0;color:#9fb0ff;padding:4px 0 0;margin:6px 0 0;font:500 13px var(--sans);cursor:pointer;text-decoration:underline}
+.rpslot .dcf{margin:0 0 12px 14px;padding:2px 12px 12px;border-left:2px solid #9fb0ff}
+.rpslot .dcf textarea{min-height:64px}
+.rpslot .dcf button.lnk{border:0;background:none;margin-left:10px}
+.disc .none{color:#9aa4af;font-style:italic;margin:0 0 12px}
+.dcf label{display:block;font:500 13px var(--sans);color:#9aa4af;margin:12px 0 4px}
+.dcf textarea,.dcf input[type=text],.dcf input[type=email],.dcf input[type=password]{width:100%;background:#161c21;color:#eceff3;border:1px solid #2b333b;border-radius:8px;padding:9px 10px;font:15px var(--serif)}
+.dcf textarea{min-height:84px;resize:vertical}
+.dcf .hint{font-size:13px;color:#9aa4af;margin:4px 0 0}
+.dcf button[type=submit]{margin-top:12px;background:#9fb0ff;color:#0c1014;border:0;border-radius:99px;padding:9px 18px;font:600 14px var(--sans);cursor:pointer}
+.dcf button:disabled{opacity:.6}
+.dcf button.lnk{background:none;color:#9fb0ff;padding:0;margin:0 0 0 6px;border-radius:0;text-decoration:underline;font:500 14px var(--sans);cursor:pointer}
+.dcf .who{font-size:15px;margin:14px 0 0}
+.dcf label.chk{display:flex;gap:8px;align-items:center;margin:12px 0 0}
 .sg button.lnk{background:none;color:#9fb0ff;padding:0;margin:0 0 0 6px;border-radius:0;text-decoration:underline;font:500 14px var(--sans)}
 .sg .who{font-size:15px;margin:14px 0 0}
 .sg label.chk{display:flex;gap:8px;align-items:center;margin:12px 0 0}
@@ -125,7 +147,7 @@ aside a{color:#9fb0ff}
 
 <section class="wrap tb" aria-label="Search, sort and filter">
   <div class="row">
-    <input id="q" type="search" placeholder="Search title, people, comments" aria-label="Search">
+    <input id="q" type="search" placeholder="Search title, people, description" aria-label="Search">
     <label class="lab" for="sf">Sort</label><select id="sf"></select>
     <button class="btn" id="dir"></button>
     <label class="lab" for="gf">Group</label><select id="gf"></select>
@@ -156,7 +178,7 @@ const CONFIG = {
   formUrl: "upload.html",  // Link to the upload page. Leave empty to hide the Submit button.
   columns: {    // Right-hand side must match your Sheet headings (capitals don't matter).
     title:["TITLE","NAME"], date:"DATE", by:"PHOTOGRAPHER", people:"PEOPLE", coll:"PROGRAM",
-    tags:"TAGS", notes:["COMMENTS","NOTES"], era:"ERA", source:"SOURCE", file:"FILE NAME", photo:"PHOTO LINK", status:"STATUS"
+    tags:"TAGS", notes:["DESCRIPTION","COMMENTS","NOTES"], era:"ERA", source:"SOURCE", file:"FILE NAME", photo:"PHOTO LINK", status:"STATUS"
   },
   // Password screen. Leave "" to turn it off. To change the password, open the site with #makehash at the end of the address
   // (for example .../Rowe-photo-archive/#makehash), type a new password, and paste the code it shows here.
@@ -174,7 +196,7 @@ const CONFIG = {
 /* ========================================================= */
 
 const $ = id => document.getElementById(id);
-const F = [["title","Title"],["date","Date"],["era","Era"],["by","Photographer"],["people","People"],["coll","Program"],["tags","Tags"],["notes","Comments"],["source","Source"],["file","File Name"]];
+const F = [["title","Title"],["date","Date"],["era","Era"],["by","Photographer"],["people","People"],["coll","Program"],["tags","Tags"],["notes","Description"],["source","Source"],["file","File Name"]];
 const SORTABLE = F.filter(f => f[0] !== "notes");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let rows = [], order = [], cur = -1, demo = false;
@@ -218,7 +240,7 @@ function sample(){return [
 ].map((r,i)=>({id:i,title:r[0],date:r[1],by:r[2],people:"",coll:r[4],tags:r[5],notes:r[6],data:art(i+1)}))}
 
 async function load(){
-  if(!CONFIG.csvUrl){demo=true;rows=sample();return start()}
+  if(!CONFIG.csvUrl){demo=true;rows=sample();start();loadDiscussion();return}
   try{
     const res=await fetch(CONFIG.csvUrl);if(!res.ok)throw 0;
     const t=parseCSV(await res.text()),head=t[0].map(h=>h.trim().toLowerCase()),C=CONFIG.columns,ix=k=>{const i=[].concat(C[k]).map(n=>head.indexOf(n.toLowerCase())).find(i=>i>=0);return i===undefined?-1:i};
@@ -227,7 +249,7 @@ async function load(){
       o.img=driveId(r[ix("photo")]);
       o.status=ix("status")>=0?(r[ix("status")]||"").trim():CONFIG.approvedValue;return o})
      .filter(o=>o.img&&o.status.toLowerCase()===CONFIG.approvedValue.toLowerCase());
-    start();loadContribs();
+    start();loadContribs();loadDiscussion();
   }catch(e){$("out").innerHTML='<p class="msg">The archive could not be loaded. Check that the Sheet is published to the web as CSV and that CONFIG.csvUrl is correct.</p>'}
 }
 
@@ -346,7 +368,7 @@ function pane(r){const d=document.createElement("div");d.className="pane";
   pic.onclick=e=>{if(Date.now()-lastTouch<700)return;if(pic._s>1.02){resetZ(pic,true);return}origin(e);pic.classList.toggle("z")};
   pic.onmousemove=e=>{if(pic.classList.contains("z"))origin(e)};
   d.appendChild(pic);return d}
-function detail(r){return [[r.date?"Date":"Era",r.date||r.era],["Program",r.coll],["People",r.people],["Photographer",r.by],["Source",r.source],["File Name",r.file],["Tags",r.tags],["Comments",r.notes]]
+function detail(r){return [[r.date?"Date":"Era",r.date||r.era],["Program",r.coll],["People",r.people],["Photographer",r.by],["Source",r.source],["File Name",r.file],["Tags",r.tags],["Description",r.notes]]
   .map(([k,v])=>`<dt>${k}</dt><dd>${k==="Source"&&/^https?:\/\//i.test(v)?`<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`:esc(v||"—")}</dd>`).join("")}
 function whenTxt(s){const d=new Date(s);return isNaN(d)?"":d.toLocaleDateString(undefined,{month:"short",year:"numeric"})}
 function addLink(r){const u=CONFIG.contribFormUrl,e=CONFIG.contribPhotoEntry;if(!u||!e||!r.img)return "";
@@ -358,12 +380,46 @@ const ID_KEY="rowe-visitor";
 function getId(){try{const o=JSON.parse(localStorage.getItem(ID_KEY)||"null");return o&&o.name&&o.email?o:null}catch(e){return null}}
 function setId(name,email){try{localStorage.setItem(ID_KEY,JSON.stringify({name,email}))}catch(e){}}
 function clearId(){try{localStorage.removeItem(ID_KEY)}catch(e){}}
-function idFields(){return `<label for="sg_name">Your name *</label><input type="text" id="sg_name" name="who" autocomplete="name">
-<label for="sg_email">Your email address *</label><input type="email" id="sg_email" name="email" autocomplete="email">
-<p class="hint">Kept privately. It is not shown on the site.</p>
+function idFields(p){p=p||"sg";return `<label for="${p}_name">Your name *</label><input type="text" id="${p}_name" name="who" autocomplete="name">
+<label for="${p}_email">Your email address *</label><input type="email" id="${p}_email" name="email" autocomplete="email">
+<p class="hint">${p==="dc"||p==="rp"?"Your name is shown with your message. Your email is kept private.":"Kept privately. It is not shown on the site."}</p>
 <label class="chk"><input type="checkbox" name="remember" checked> Remember my name and email on this device</label>`}
-function idHTML(){const i=getId();
-  return i?`<p class="who">Sending as <b>${esc(i.name)}</b> (${esc(i.email)}) <button type="button" class="lnk" id="sg_chg">Not you?</button></p><input type="hidden" name="who" value="${esc(i.name)}"><input type="hidden" name="email" value="${esc(i.email)}">`:idFields()}
+function idHTML(p){p=p||"sg";const i=getId();
+  return i?`<p class="who">Sending as <b>${esc(i.name)}</b> (${esc(i.email)}) <button type="button" class="lnk" data-chg="${p}">Not you?</button></p><input type="hidden" name="who" value="${esc(i.name)}"><input type="hidden" name="email" value="${esc(i.email)}">`:idFields(p)}
+function refreshIds(){const i=getId();["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(!b||!i||b.querySelector(".who"))return;
+  if([...b.querySelectorAll("input[type=text],input[type=email]")].every(x=>!x.value))b.innerHTML=idHTML(q)})}
+/* ---- discussion: a message board for each photo ---- */
+let DISC=null;   // null = loading, "err" = could not load, otherwise { photoId: [messages] }
+const fmtDate=s=>{const d=new Date(s);return isNaN(d)?"":d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})};
+function discListHTML(r){
+  if(DISC===null)return '<p class="none">Loading the discussion…</p>';
+  if(DISC==="err")return '<p class="none">The discussion couldn\'t be loaded right now.</p>';
+  const L=DISC[r.img]||[];
+  const msg=(m,cls)=>`<article class="dm${cls}"><header><b>${esc(m.name||"Anonymous")}</b><span>${esc(fmtDate(m.when))}</span></header><p>${esc(m.text)}</p></article>`;
+  const tops=L.filter(m=>!m.replyTo),kids=id=>L.filter(m=>m.replyTo===id);
+  return tops.length?tops.map(m=>{const k=kids(m.id);
+    return `<div class="th" data-id="${esc(m.id)}">${msg(m,"")}${k.length?`<div class="replies">${k.map(x=>msg(x," reply")).join("")}</div>`:""}<div class="rpslot"><button type="button" class="rbtn" data-reply="${esc(m.id)}">Reply</button></div></div>`}).join(""):'<p class="none">No messages yet. Start the conversation.</p>'}
+function replyForm(id){return `<form class="dcf rpf" data-parent="${esc(id)}" novalidate><label for="rp_text">Your reply</label>
+<textarea id="rp_text" name="text"></textarea>
+<div id="rp_id">${idHTML("rp")}</div>
+${pwSaved()?"":'<label for="rp_pw">Archive password *</label><input type="password" id="rp_pw" name="pw" autocomplete="current-password">'}
+<input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<button type="submit">Post reply</button> <button type="button" class="lnk" data-rcancel="${esc(id)}">Cancel</button><p class="sgm" role="status"></p></form>`}
+function closeReplies(){document.querySelectorAll(".rpf").forEach(f=>{const sl=f.parentElement,id=f.dataset.parent;sl.innerHTML=`<button type="button" class="rbtn" data-reply="${esc(id)}">Reply</button>`})}
+function discHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
+  return `<section class="disc"><h4>Discussion</h4><div id="disc_list" aria-live="polite">${discListHTML(r)}</div>
+<form class="dcf" novalidate><label for="dc_text">Add to the discussion</label>
+<textarea id="dc_text" name="text" placeholder="Share a memory, name a face, or ask a question."></textarea>
+<div id="dc_id">${idHTML("dc")}</div>
+${pwSaved()?"":'<label for="dc_pw">Archive password *</label><input type="password" id="dc_pw" name="pw" autocomplete="current-password">'}
+<input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+<button type="submit">Post message</button><p class="sgm" role="status"></p></form></section>`}
+async function loadDiscussion(){if(!CONFIG.suggestApiUrl)return;
+  try{const res=await fetch(CONFIG.suggestApiUrl,{method:"POST",body:JSON.stringify({action:"discussion"})});
+    const out=await res.json();if(!out.ok)throw 0;
+    const m={};(out.posts||[]).forEach(p=>(m[p.photo]=m[p.photo]||[]).push(p));DISC=m}
+  catch(e){DISC="err"}
+  const l=$("disc_list");if(l&&order[cur])l.innerHTML=discListHTML(order[cur])}
 function suggestHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
   const cur=r.date||r.era||"",progs=(!r.coll||PROGS.includes(r.coll))?PROGS:PROGS.concat(r.coll);
   const f=(k,l,v,ph)=>`<label for="sg_${k}">${l}</label><input type="text" id="sg_${k}" name="${k}" value="${esc(v)}" data-orig="${esc(v)}" placeholder="${esc(ph||"")}" autocomplete="off">`;
@@ -375,16 +431,16 @@ ${f("date","Date or era",cur,"1992, June 1992, or 1980s")}
 ${f("people","People in the photo",r.people,"First Last, First Last")}
 ${f("tags","Tags",r.tags,"canoeing, chapel, dinner")}
 <label for="sg_info">Add information about this photo</label><textarea id="sg_info" name="info" placeholder="Who, what, where, when, or any story behind the photo."></textarea>
-<p class="hint">This is added to the photo's comments.</p>
+<p class="hint">This is added to the photo's description.</p>
 <label for="sg_note">Note to the editors (not shown on the site)</label><textarea id="sg_note" name="note" placeholder="Something wrong, or something to remove? Tell us here."></textarea>
-<div id="sg_id">${idHTML()}</div>
+<div id="sg_id">${idHTML("sg")}</div>
 ${pwSaved()?"":'<label for="sg_pw">Archive password *</label><input type="password" id="sg_pw" name="pw" autocomplete="current-password">'}
 <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
 <button type="submit">Send suggestion</button><p class="sgm" role="status"></p></form></details>`}
 function contribHTML(r){const c=r.contribs||[],a=addLink(r);if(!c.length&&!a)return "";
   return `<div class="cm"><h4>Added by visitors</h4>${c.length?c.map(x=>`<blockquote>${esc(x.text)}<cite>${esc([x.name||"Anonymous",whenTxt(x.when)].filter(Boolean).join(", "))}</cite></blockquote>`).join(""):'<p class="none">Nothing added yet.</p>'}${a}</div>`}
 function fillInfo(){const r=order[cur];$("ct").textContent=`${cur+1} of ${order.length}`;
-  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${detail(r)}</dl>${contribHTML(r)}${suggestHTML(r)}`;
+  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${detail(r)}</dl>${contribHTML(r)}${discHTML(r)}${suggestHTML(r)}`;
   const tg=$("sg_tags");if(tg){let pool=null;tagSuggest(tg,()=>pool||(pool=tagPool()))}}
 function preload(){[1,-1].forEach(d=>{const p=new Image;p.src=src(order[nxt(d)],1800)})}
 function slide(cp,np,dir){busy=true;cur=nxt(dir);fillInfo();curP=np;
@@ -495,11 +551,36 @@ $("lb").addEventListener("submit",async e=>{
   try{await api("suggest",{password:pw,suggestion:s});
     try{sessionStorage.setItem("rowe-pw",pw)}catch(err){}
     const rm=el("remember");if(!getId()&&rm&&rm.checked)setId(s.name,s.email);
+    refreshIds();
     f.innerHTML='<p class="sgm">Thank you! Your suggestion will appear after it has been reviewed.</p><button type="button" id="sg_again">Suggest another change</button>'}
   catch(err){msg.textContent=err.message;btn.disabled=false}});
 $("lb").addEventListener("click",e=>{
-  if(e.target.id==="sg_chg"){clearId();$("sg_id").innerHTML=idFields();$("sg_name").focus()}
+  const c=e.target.dataset&&e.target.dataset.chg;
+  const rb=e.target.closest&&e.target.closest("[data-reply]"),rc=e.target.closest&&e.target.closest("[data-rcancel]");
+  if(rb){const id=rb.dataset.reply;closeReplies();const sl=rb.parentElement;sl.innerHTML=replyForm(id);$("rp_text").focus();return}
+  if(rc){closeReplies();return}
+  if(c){clearId();["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(b)b.innerHTML=idFields(q)});$(c+"_name").focus()}
   else if(e.target.id==="sg_again"){fillInfo();const d=$("side").querySelector(".sg");if(d){d.open=true;d.scrollIntoView({block:"nearest"})}}});
+$("lb").addEventListener("submit",async e=>{
+  const f=e.target;if(!f.classList||!f.classList.contains("dcf"))return;
+  e.preventDefault();
+  const r=order[cur],msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),el=n=>f.elements[n],v=n=>el(n)?el(n).value.trim():"";
+  if(v("website"))return;
+  const d={photoId:r.img,name:v("who"),email:v("email"),text:v("text")},isReply=!!f.dataset.parent;if(isReply)d.replyTo=f.dataset.parent;
+  if(!d.text){msg.textContent="Please write a message first.";return}
+  if(!d.name){msg.textContent="Please enter your name.";return}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)){msg.textContent="Please enter a valid email address.";return}
+  const pw=pwSaved()||v("pw");
+  if(!pw){msg.textContent="Please enter the archive password.";return}
+  btn.disabled=true;msg.textContent="Posting…";
+  try{const out=await api("discuss",{password:pw,discussion:d});
+    try{sessionStorage.setItem("rowe-pw",pw)}catch(err){}
+    const rm=el("remember");if(!getId()&&rm&&rm.checked)setId(d.name,d.email);
+    if(out.approved&&out.post){if(!DISC||DISC==="err")DISC={};(DISC[r.img]=DISC[r.img]||[]).push(out.post);$("disc_list").innerHTML=discListHTML(r)}
+    el("text").value="";if(!isReply&&getId())$("dc_id").innerHTML=idHTML("dc");refreshIds();
+    msg.textContent=out.approved?"Posted. Thank you!":isReply?"Thank you! Your reply will appear after it has been reviewed.":"Thank you! Your message will appear after it has been reviewed."}
+  catch(err){msg.textContent=err.message}
+  btn.disabled=false});
 const KEY="rowe-archive-ok";
 async function sha(t){if(!(window.crypto&&crypto.subtle))throw 0;
   const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("rowe-archive:"+t));
