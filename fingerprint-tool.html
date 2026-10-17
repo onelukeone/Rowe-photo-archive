@@ -37,8 +37,8 @@ a{color:var(--acc)}
   <p class="mute">A tool for the archive's editors. It gives every existing photo a short fingerprint so that duplicates can be spotted. It changes nothing except filling a HASH column in the sheet.</p>
 
   <form id="gate">
-    <label for="pw">Archive password</label>
-    <input type="password" id="pw" autocomplete="current-password">
+    <label for="pw">Editor access code</label>
+    <input type="text" id="pw" autocomplete="off" autocapitalize="characters" spellcheck="false">
     <button class="btn" id="gbtn" type="submit">Continue</button>
     <p class="msg err" id="gerr" role="alert"></p>
   </form>
@@ -99,7 +99,7 @@ async function api(action, payload) {
 }
 $("gate").onsubmit = async e => {
   e.preventDefault(); $("gerr").textContent = ""; $("gbtn").disabled = true;
-  try { await api("check", { password: $("pw").value }); PW = $("pw").value; $("gate").hidden = true; $("tool").hidden = false; }
+  try { await api("checkAdmin", { password: $("pw").value }); PW = $("pw").value; $("gate").hidden = true; $("tool").hidden = false; }
   catch (err) { $("gerr").textContent = err.message; }
   $("gbtn").disabled = false;
 };

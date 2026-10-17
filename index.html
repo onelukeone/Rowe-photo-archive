@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow">
+<meta name="robots" content="noindex,nofollow,noarchive,noimageindex">
 <title>Rowe Camp Photo Archive</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -153,6 +153,16 @@ aside a{color:#9fb0ff}
   h1{font-size:7vw;flex-basis:100%}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.tile img,.pane img{-webkit-user-drag:none}
+@media print{body>*{display:none!important}body::before{content:"Printing is turned off for this archive.";display:block;padding:40px;font:16px sans-serif}}
+.gate .gnote{max-width:36ch;font:400 14px/1.45 var(--sans);color:var(--mute);margin:0}
+#rform{max-width:420px;width:100%}
+#rform[hidden]{display:none}
+#rform input{flex:1 1 100%}
+#rmsg{flex:1 1 100%;min-height:1.4em;margin:0;font:400 14px/1.4 var(--sans);color:var(--mute)}
+.sob,.gate .sob{background:none;border:0;border-radius:0;color:var(--acc);text-decoration:underline;cursor:pointer;padding:0;font:500 14px var(--sans)}
+#foot .sob{color:var(--mute);font-size:13px}
 </style>
 </head>
 <body>
@@ -183,24 +193,32 @@ aside a{color:#9fb0ff}
 <div class="gate" id="gate" hidden>
   <div class="owl" role="img" aria-label="Flying owl"></div>
   <h1 id="gt">Rowe Camp Photo Archive</h1>
-  <form id="gform"><input id="pw" type="password" placeholder="Password" aria-label="Password" autocomplete="current-password"><button type="submit">Enter</button></form>
+  <form id="gform"><input id="pw" type="text" placeholder="Access code" aria-label="Access code" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="submit" id="gbtn">Enter</button></form>
   <p id="gerr" role="alert"></p>
-  <p id="hres" hidden></p>
+  <p class="gnote">Your personal access code was emailed to you.</p>
+  <button type="button" class="sob" id="reqlink">Don't have a code? Request access</button>
+  <form id="rform" hidden novalidate>
+    <p class="gnote">Tell us who you are and we'll email you a code once your request is approved.</p>
+    <input id="rq_name" type="text" placeholder="Your name" aria-label="Your name" autocomplete="name" maxlength="100">
+    <input id="rq_email" type="email" placeholder="Your email address" aria-label="Your email address" autocomplete="email" maxlength="200">
+    <input id="rq_note" type="text" placeholder="How do you know Rowe? (optional)" aria-label="How do you know Rowe? (optional)" maxlength="500">
+    <input class="hp" id="rq_web" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <button type="submit" id="rbtn">Request access</button>
+    <p id="rmsg" role="status"></p>
+  </form>
 </div>
 <dialog id="lb" aria-label="Photo viewer"></dialog>
 
 <script>
 /* ============ SETTINGS: edit this block only ============ */
 const CONFIG = {
-  csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHiTyD5gNV9CDo8Cs72TyoBZJhbsSgMv-5cX1uDWPLfgMypeXKF_YImtk1gk10WqyPLV71EVI-7x5W/pub?gid=0&single=true&output=csv",  // Your published Google Sheet (CSV). Leave empty to preview with sample photos.
   formUrl: "upload.html",  // Link to the upload page. Leave empty to hide the Submit button.
   columns: {    // Right-hand side must match your Sheet headings (capitals don't matter).
     title:["TITLE","NAME"], date:"DATE", by:"PHOTOGRAPHER", people:"PEOPLE", coll:"PROGRAM",
     tags:"TAGS", notes:["DESCRIPTION","COMMENTS","NOTES"], era:"ERA", source:"SOURCE", file:"FILE NAME", photo:"PHOTO LINK", status:"STATUS"
   },
-  // Password screen. Leave "" to turn it off. To change the password, open the site with #makehash at the end of the address
-  // (for example .../Rowe-photo-archive/#makehash), type a new password, and paste the code it shows here.
-  passwordHash: "9958399d48e55891f7977f35ee0ab03ec4b284f5e7a699ca04671b762a23e886",
+  // Sign-in: people type a personal access code (see the Members tab). The photo list comes from the Apps Script web app below,
+  // never from a published spreadsheet. Leave suggestApiUrl "" to preview the page with sample photos and no sign-in.
   // Visitor contributions (optional). Leave contribCsvUrl "" to turn this feature off.
   contribCsvUrl: "",      // Published CSV link of the tab that holds the "Add what you know" Form responses
   contribFormUrl: "",     // That Form's address, ending in /viewform
@@ -257,19 +275,14 @@ function sample(){return [
  ["Darkroom, red light","1936-07-20","J. Lindqvist","Malmö","Other Youth Camps","interior, portrait","Self-portrait with enlarger."]
 ].map((r,i)=>({id:i,title:r[0],date:r[1],by:r[2],people:"",coll:r[4],tags:r[5],notes:r[6],data:art(i+1)}))}
 
-async function load(){
-  if(!CONFIG.csvUrl){demo=true;rows=sample();start();loadDiscussion();return}
-  try{
-    const res=await fetch(CONFIG.csvUrl);if(!res.ok)throw 0;
-    const t=parseCSV(await res.text()),head=t[0].map(h=>h.trim().toLowerCase()),C=CONFIG.columns,ix=k=>{const i=[].concat(C[k]).map(n=>head.indexOf(n.toLowerCase())).find(i=>i>=0);return i===undefined?-1:i};
-    rows=t.slice(1).filter(r=>r.some(x=>x)).map((r,i)=>{const o={id:i};
-      F.forEach(f=>o[f[0]]=(r[ix(f[0])]||"").trim());o.date=isoDate(o.date);
-      o.img=driveId(r[ix("photo")]);
-      o.status=ix("status")>=0?(r[ix("status")]||"").trim():CONFIG.approvedValue;return o})
-     .filter(o=>o.img&&o.status.toLowerCase()===CONFIG.approvedValue.toLowerCase());
-    start();loadContribs();loadDiscussion();
-  }catch(e){$("out").innerHTML='<p class="msg">The archive could not be loaded. Check that the Sheet is published to the web as CSV and that CONFIG.csvUrl is correct.</p>'}
-}
+function applyList(out){
+  const t=[out.head||[]].concat(out.rows||[]),head=t[0].map(h=>h.trim().toLowerCase()),C=CONFIG.columns,ix=k=>{const i=[].concat(C[k]).map(n=>head.indexOf(n.toLowerCase())).find(i=>i>=0);return i===undefined?-1:i};
+  rows=t.slice(1).filter(r=>r.some(x=>x)).map((r,i)=>{const o={id:i};
+    F.forEach(f=>o[f[0]]=(r[ix(f[0])]||"").trim());o.date=isoDate(o.date);
+    o.img=driveId(r[ix("photo")]);
+    o.status=ix("status")>=0?(r[ix("status")]||"").trim():CONFIG.approvedValue;return o})
+   .filter(o=>o.img&&o.status.toLowerCase()===CONFIG.approvedValue.toLowerCase());
+  start();loadContribs();loadDiscussion()}
 
 /* ---- state in URL so views can be shared ---- */
 function readHash(){const p=new URLSearchParams(location.hash.slice(1));
@@ -335,7 +348,7 @@ function render(){
 }
 function start(){
   readHash();build();
-  $("foot").textContent=demo?"Sample data":"";
+  $("foot").innerHTML=demo?"Sample data":'<button type="button" class="sob" id="signout">Sign out</button>';
   render();
 }
 
@@ -425,7 +438,7 @@ function discListHTML(r){
 function replyForm(id){return `<form class="dcf rpf" data-parent="${esc(id)}" novalidate><label for="rp_text">Your reply</label>
 <textarea id="rp_text" name="text"></textarea>
 <div id="rp_id">${idHTML("rp")}</div>
-${pwSaved()?"":'<label for="rp_pw">Archive password *</label><input type="password" id="rp_pw" name="pw" autocomplete="current-password">'}
+${pwSaved()?"":'<label for="rp_pw">Access code *</label><input type="password" id="rp_pw" name="pw" autocomplete="current-password">'}
 <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
 <button type="submit">Post reply</button> <button type="button" class="lnk" data-rcancel="${esc(id)}">Cancel</button><p class="sgm" role="status"></p></form>`}
 function closeReplies(){document.querySelectorAll(".rpf").forEach(f=>{const sl=f.parentElement,id=f.dataset.parent;sl.innerHTML=`<button type="button" class="rbtn" data-reply="${esc(id)}">Reply</button>`})}
@@ -434,11 +447,11 @@ function discHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
 <form class="dcf" novalidate><label for="dc_text">Add to the discussion</label>
 <textarea id="dc_text" name="text" placeholder="Share a memory, name a face, or ask a question."></textarea>
 <div id="dc_id">${idHTML("dc")}</div>
-${pwSaved()?"":'<label for="dc_pw">Archive password *</label><input type="password" id="dc_pw" name="pw" autocomplete="current-password">'}
+${pwSaved()?"":'<label for="dc_pw">Access code *</label><input type="password" id="dc_pw" name="pw" autocomplete="current-password">'}
 <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
 <button type="submit">Post message</button><p class="sgm" role="status"></p></form></section>`}
 async function loadDiscussion(){if(!CONFIG.suggestApiUrl)return;
-  try{const res=await fetch(CONFIG.suggestApiUrl,{method:"POST",body:JSON.stringify({action:"discussion"})});
+  try{const res=await fetch(CONFIG.suggestApiUrl,{method:"POST",body:JSON.stringify({action:"discussion",password:CODE})});
     const out=await res.json();if(!out.ok)throw 0;
     const m={};(out.posts||[]).forEach(p=>(m[p.photo]=m[p.photo]||[]).push(p));DISC=m}
   catch(e){DISC="err"}
@@ -458,7 +471,7 @@ ${f("tags","Tags",r.tags,"canoeing, chapel, dinner")}
 <p class="hint">This is added to the photo's description.</p>
 <label for="sg_note">Note to the editors (not shown on the site)</label><textarea id="sg_note" name="note" placeholder="Something wrong, or something to remove? Tell us here."></textarea>
 <div id="sg_id">${idHTML("sg")}</div>
-${pwSaved()?"":'<label for="sg_pw">Archive password *</label><input type="password" id="sg_pw" name="pw" autocomplete="current-password">'}
+${pwSaved()?"":'<label for="sg_pw">Access code *</label><input type="password" id="sg_pw" name="pw" autocomplete="current-password">'}
 <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
 <button type="submit">Send suggestion</button><p class="sgm" role="status"></p></form></details>`}
 function contribHTML(r){const c=r.contribs||[],a=addLink(r);if(!c.length&&!a)return "";
@@ -549,13 +562,14 @@ $("clear").onclick=()=>{st.q="";st.qf="";st.prog.clear();st.dec.clear();render()
 $("out").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;openViewer(order.findIndex(r=>r.id==t.dataset.id));$("lb").showModal()};
 if(CONFIG.formUrl){$("addlink").href=CONFIG.formUrl;$("addlink").hidden=false}
 window.addEventListener("hashchange",()=>{readHash();if(rows.length)render()});
-const pwSaved=()=>{try{return sessionStorage.getItem("rowe-pw")||""}catch(e){return ""}};
+let CODE="";
+const pwSaved=()=>CODE;
 async function api(action,payload){
   let res;
   try{res=await fetch(CONFIG.suggestApiUrl,{method:"POST",body:JSON.stringify(Object.assign({action},payload))})}
   catch(e){throw new Error("Couldn't reach the server. Please check your connection and try again.")}
   let out;try{out=await res.json()}catch(e){throw new Error("The server sent an unexpected reply. Please try again later.")}
-  if(!out.ok)throw new Error(out.error||"Something went wrong.");
+  if(!out.ok){const e=new Error(out.error||"Something went wrong.");e.kind=out.kind||"";throw e}
   return out}
 $("lb").addEventListener("submit",async e=>{
   const f=e.target;if(!f.classList||!f.classList.contains("sgf"))return;
@@ -571,10 +585,9 @@ $("lb").addEventListener("submit",async e=>{
   if(!s.name){msg.textContent="Please enter your name.";return}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.email)){msg.textContent="Please enter a valid email address.";return}
   const pw=pwSaved()||v("pw");
-  if(!pw){msg.textContent="Please enter the archive password.";return}
+  if(!pw){msg.textContent="Please enter your access code.";return}
   btn.disabled=true;msg.textContent="Sending…";
   try{await api("suggest",{password:pw,suggestion:s});
-    try{sessionStorage.setItem("rowe-pw",pw)}catch(err){}
     const rm=el("remember");if(!getId()&&rm&&rm.checked)setId(s.name,s.email);
     refreshIds();
     f.innerHTML='<p class="sgm">Thank you! Your suggestion will appear after it has been reviewed.</p><button type="button" id="sg_again">Suggest another change</button>'}
@@ -596,34 +609,53 @@ $("lb").addEventListener("submit",async e=>{
   if(!d.name){msg.textContent="Please enter your name.";return}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)){msg.textContent="Please enter a valid email address.";return}
   const pw=pwSaved()||v("pw");
-  if(!pw){msg.textContent="Please enter the archive password.";return}
+  if(!pw){msg.textContent="Please enter your access code.";return}
   btn.disabled=true;msg.textContent="Posting…";
   try{const out=await api("discuss",{password:pw,discussion:d});
-    try{sessionStorage.setItem("rowe-pw",pw)}catch(err){}
     const rm=el("remember");if(!getId()&&rm&&rm.checked)setId(d.name,d.email);
     if(out.approved&&out.post){if(!DISC||DISC==="err")DISC={};(DISC[r.img]=DISC[r.img]||[]).push(out.post);$("disc_list").innerHTML=discListHTML(r)}
     el("text").value="";if(!isReply&&getId())$("dc_id").innerHTML=idHTML("dc");refreshIds();
     msg.textContent=out.approved?"Posted. Thank you!":isReply?"Thank you! Your reply will appear after it has been reviewed.":"Thank you! Your message will appear after it has been reviewed."}
   catch(err){msg.textContent=err.message}
   btn.disabled=false});
-const KEY="rowe-archive-ok";
-async function sha(t){if(!(window.crypto&&crypto.subtle))throw 0;
-  const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode("rowe-archive:"+t));
-  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
-function unlock(){document.body.classList.remove("locked");$("gate").hidden=true;load()}
+const CODE_KEY="rowe-code";
+const storedCode=()=>{try{return localStorage.getItem(CODE_KEY)||""}catch(e){return ""}};
+const storeCode=c=>{try{localStorage.setItem(CODE_KEY,c)}catch(e){}};
+const forgetCode=()=>{try{localStorage.removeItem(CODE_KEY)}catch(e){}};
+function unlock(){document.body.classList.remove("locked");$("gate").hidden=true}
+function signOut(){forgetCode();CODE="";location.reload()}
+async function signIn(c){
+  c=String(c||"").trim();if(!c)return;
+  $("gerr").textContent="Signing in…";$("gbtn").disabled=true;
+  try{const out=await api("list",{password:c});
+    CODE=c;storeCode(c);unlock();applyList(out)}
+  catch(err){if(err.kind==="auth")forgetCode();$("gerr").textContent=err.message;$("pw").focus()}
+  $("gbtn").disabled=false}
 function boot(){
-  const h=CONFIG.passwordHash,helper=location.hash==="#makehash";
-  let ok=false;try{ok=!!h&&localStorage.getItem(KEY)===h}catch(e){}
-  if(!helper&&(!h||ok)){load();return}
-  document.body.classList.add("locked");$("gate").hidden=false;$("pw").focus();
-  if(helper){$("gt").textContent="Make a password code";$("pw").type="text";$("pw").placeholder="New password"}
-  $("gform").onsubmit=async e=>{e.preventDefault();$("gerr").textContent="";
-    try{const x=await sha($("pw").value);
-      if(helper){$("hres").hidden=false;$("hres").innerHTML="Paste this into <b>passwordHash</b> in index.html:<br><code></code>";$("hres").querySelector("code").textContent=x;return}
-      if(x===h){try{localStorage.setItem(KEY,h);sessionStorage.setItem("rowe-pw",$("pw").value)}catch(e){}unlock()}
-      else{$("gerr").textContent="That password isn't right. Please try again.";$("pw").select()}
-    }catch(err){$("gerr").textContent="This browser can't check passwords here. Try opening the site over https."}};
+  try{localStorage.removeItem("rowe-archive-ok");sessionStorage.removeItem("rowe-pw")}catch(e){}
+  if(!CONFIG.suggestApiUrl){demo=true;rows=sample();start();return}
+  /* a personal link from the welcome email ends in #k=CODE: sign in with it, then take it out of the address bar */
+  const hp=new URLSearchParams(location.hash.slice(1)),fromLink=hp.get("k")||"";
+  if(hp.has("k")){hp.delete("k");try{history.replaceState(null,"",hp.toString()?"#"+hp:location.pathname+location.search)}catch(e){}}
+  document.body.classList.add("locked");$("gate").hidden=false;
+  $("gform").onsubmit=e=>{e.preventDefault();signIn($("pw").value)};
+  $("reqlink").onclick=()=>{const r=$("rform");r.hidden=!r.hidden;if(!r.hidden)$("rq_name").focus()};
+  $("rform").onsubmit=async e=>{e.preventDefault();
+    const m=$("rmsg"),n=$("rq_name").value.trim(),em=$("rq_email").value.trim();
+    if(!n){m.textContent="Please enter your name.";return}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)){m.textContent="Please enter a valid email address.";return}
+    $("rbtn").disabled=true;m.textContent="Sending…";
+    try{await api("requestAccess",{request:{name:n,email:em,note:$("rq_note").value.trim(),website:$("rq_web").value}});
+      $("rform").innerHTML='<p class="gnote">Thank you! Your request has been sent. You will be emailed a code once it is approved.</p>'}
+    catch(err){m.textContent=err.message;$("rbtn").disabled=false}};
+  const c0=fromLink||storedCode();
+  if(c0)signIn(c0);else $("pw").focus();
 }
+/* ---- gentle deterrents against copying photos. They stop casual saving, not screenshots. ---- */
+document.addEventListener("contextmenu",e=>{if(e.target.closest&&e.target.closest("img,.tile,.pane"))e.preventDefault()});
+document.addEventListener("dragstart",e=>{if(e.target.tagName==="IMG")e.preventDefault()});
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&!e.altKey&&/^[sp]$/i.test(e.key))e.preventDefault()});
+$("foot").addEventListener("click",e=>{if(e.target.id==="signout")signOut()});
 boot();
 </script>
 </body>

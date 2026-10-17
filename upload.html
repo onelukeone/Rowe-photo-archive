@@ -80,9 +80,9 @@ ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
   <a class="back" href="./">&larr; Back to the archive</a>
 
   <form id="gate">
-    <p>Please enter the archive password to continue.</p>
-    <label for="pw">Password</label>
-    <input type="password" id="pw" autocomplete="current-password" required>
+    <p>Please enter your access code to continue.</p>
+    <label for="pw">Access code</label>
+    <input type="text" id="pw" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
     <p class="msg err" id="gerr" role="alert"></p>
     <button class="btn" id="gbtn" type="submit">Continue</button>
   </form>
@@ -145,7 +145,6 @@ ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
 /* ============ SETTINGS ============ */
 const API = "https://script.google.com/macros/s/AKfycbxkwkozQwDOW6YYDhqsVArnDQfMgXAyCMSZ-lf1xeY-LzL4O4CHG2QGyrOE-gnjHQ/exec";  // Your Apps Script web app address
 const PROGRAMS = ["Senior High Camp","Junior High Camp","YPC","Other Youth Camps","Conferences","Rowe Center general"];
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQHiTyD5gNV9CDo8Cs72TyoBZJhbsSgMv-5cX1uDWPLfgMypeXKF_YImtk1gk10WqyPLV71EVI-7x5W/pub?gid=0&single=true&output=csv";  // Your published sheet, used to suggest keywords that already exist
 const MAX_FILES = 10;
 const MAX_SIDE = 2800;   // photos are shrunk to this many pixels on the longest side before sending
 /* ================================= */
@@ -215,15 +214,9 @@ async function fpOfFile(file) { const url = URL.createObjectURL(file); try { ret
 
 let EXISTING=[];   // photos already in the archive: { h: fingerprint, id, label }
 let TAGPOOL=[];
-function parseCSV(t){const out=[];let row=[],c="",q=false;
-  for(let i=0;i<t.length;i++){const ch=t[i];
-    if(q){if(ch==='"'){if(t[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}
-    else if(ch==='"')q=true;else if(ch===","){row.push(c);c=""}
-    else if(ch==="\n"){row.push(c);out.push(row);row=[];c=""}else if(ch!=="\r")c+=ch}
-  if(c||row.length){row.push(c);out.push(row)}return out}
 async function loadTags(){
-  try{const res=await fetch(CSV_URL);if(!res.ok)return;
-    const t=parseCSV(await res.text()),head=t[0].map(h=>h.trim().toLowerCase()),ti=head.indexOf("tags"),si=head.indexOf("status");
+  try{const out=await api("list",{password:PW,view:"upload"});
+    const t=[out.head||[]].concat(out.rows||[]),head=t[0].map(h=>h.trim().toLowerCase()),ti=head.indexOf("tags"),si=head.indexOf("status");
     {const hi=head.indexOf("hash"),li=head.indexOf("photo link"),ni=head.indexOf("title"),fi=head.indexOf("file name");
      if(hi>=0&&li>=0)EXISTING=t.slice(1).map(r=>({h:String(r[hi]||"").trim().toLowerCase(),id:(String(r[li]||"").match(/[-\w]{25,}/)||[""])[0],
        label:String(r[ni]||"").trim()||String(r[fi]||"").trim()||"a photo in the archive"})).filter(x=>fpValid(x.h)&&x.id);
@@ -257,19 +250,29 @@ async function api(action, payload) {
   catch (e) { throw new Error("Couldn't reach the upload service. Please check your connection and try again."); }
   let out;
   try { out = await res.json(); } catch (e) { throw new Error("The upload service sent an unexpected reply. Please try again later."); }
-  if (!out.ok) throw new Error(out.error || "Something went wrong.");
+  if (!out.ok) { const e = new Error(out.error || "Something went wrong."); e.kind = out.kind || ""; throw e; }
   return out;
 }
 
 tagSuggest($("tags"), () => TAGPOOL);
 PROGRAMS.forEach(p => { const o = document.createElement("option"); o.value = o.textContent = p; $("program").appendChild(o); });
 
-$("gate").onsubmit = async e => {
-  e.preventDefault(); $("gerr").textContent = ""; $("gbtn").disabled = true;
-  try { await api("check", { password: $("pw").value }); PW = $("pw").value; loadTags(); $("gate").hidden = true; $("main").hidden = false; $("name").focus(); }
-  catch (err) { $("gerr").textContent = err.message; }
+const CODE_KEY = "rowe-code";   // the same code the archive page remembers, so members only sign in once
+async function enter(code, quiet) {
+  code = String(code || "").trim(); if (!code) return;
+  $("gerr").textContent = ""; $("gbtn").disabled = true;
+  try {
+    await api("check", { password: code }); PW = code;
+    try { localStorage.setItem(CODE_KEY, code); } catch (e) {}
+    loadTags(); $("gate").hidden = true; $("main").hidden = false; $("name").focus();
+  } catch (err) {
+    if (err.kind === "auth") { try { localStorage.removeItem(CODE_KEY); } catch (e) {} }
+    if (!quiet || err.kind !== "auth") $("gerr").textContent = err.message;
+  }
   $("gbtn").disabled = false;
-};
+}
+$("gate").onsubmit = e => { e.preventDefault(); enter($("pw").value); };
+try { const saved = localStorage.getItem(CODE_KEY); if (saved) enter(saved, true); } catch (e) {}
 
 $("files").onchange = e => {
   for (const f of e.target.files) {
