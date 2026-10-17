@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Photo fingerprints | Rowe Camp Photo Archive</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+:root{--bg:#f4f5f7;--ink:#101820;--mute:#5b6570;--line:#d3d7de;--acc:#2440d9;--acc-ink:#fff;--card:#fff;--sans:system-ui,-apple-system,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif}
+@media (prefers-color-scheme:dark){:root{--bg:#12161b;--ink:#eceff3;--mute:#9aa4af;--line:#2b333b;--acc:#7f92ff;--acc-ink:#0b1030;--card:#1a2025}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 var(--serif)}
+.wrap{max-width:640px;margin:0 auto;padding:clamp(16px,4vw,36px) clamp(14px,3vw,24px) 60px}
+h1{font:700 clamp(26px,5vw,36px)/1.1 var(--sans);margin:0 0 6px}
+p{margin:10px 0}
+.mute{color:var(--mute);font-size:15px}
+label{display:block;font:600 14px var(--sans);margin:18px 0 6px}
+input[type=password]{width:100%;font:16px var(--serif);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+.btn{font:600 16px var(--sans);background:var(--acc);color:var(--acc-ink);border:0;border-radius:99px;padding:12px 24px;cursor:pointer;margin:14px 10px 0 0}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+progress{width:100%;height:14px;margin:18px 0 6px;accent-color:var(--acc)}
+.msg{min-height:1.5em;font:500 15px var(--sans)}
+.err{color:#c0392b}
+#stats{font:500 15px var(--sans);color:var(--mute)}
+[hidden]{display:none!important}
+a{color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Photo fingerprints</h1>
+  <p class="mute">A tool for the archive's editors. It gives every existing photo a short fingerprint so that duplicates can be spotted. It changes nothing except filling a HASH column in the sheet.</p>
+
+  <form id="gate">
+    <label for="pw">Archive password</label>
+    <input type="password" id="pw" autocomplete="current-password">
+    <button class="btn" id="gbtn" type="submit">Continue</button>
+    <p class="msg err" id="gerr" role="alert"></p>
+  </form>
+
+  <div id="tool" hidden>
+    <p>Press <b>Start</b> and keep this page open until it says it is finished. A few hundred photos take a few minutes. You can stop at any time and press Start again later; it carries on where it left off.</p>
+    <button class="btn" id="go" type="button">Start</button><button class="btn alt" id="stop" type="button" hidden>Stop</button>
+    <progress id="bar" value="0" max="1" hidden></progress>
+    <p id="stats"></p>
+    <p class="msg" id="msg" role="status"></p>
+  </div>
+  <p><a href="./">&larr; Back to the archive</a></p>
+</div>
+<script>
+/* ============ SETTINGS ============ */
+const API = "https://script.google.com/macros/s/AKfycbxkwkozQwDOW6YYDhqsVArnDQfMgXAyCMSZ-lf1xeY-LzL4O4CHG2QGyrOE-gnjHQ/exec";  // Your Apps Script web app address (the same one the upload page uses)
+const BATCH = 6;   // photos fetched per request
+/* ---- photo fingerprint: a 64-bit "difference hash". The same picture gives (nearly) the same fingerprint,
+        even after it has been resized or re-saved. Used by the upload page and by the fingerprint tool. ---- */
+const FP_MAX_DIFF = 6;   // how many of the 64 bits may differ and still count as "looks the same"
+function fpPixels(img) {
+  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, src = img;
+  const mk = (cw, ch) => { const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+    const g = c.getContext("2d", { willReadFrequently: true }); g.fillStyle = "#fff"; g.fillRect(0, 0, cw, ch); g.imageSmoothingQuality = "high"; return [c, g]; };
+  while (w > 144 && h > 128) { w = Math.max(144, Math.ceil(w / 2)); h = Math.max(128, Math.ceil(h / 2)); const [c, g] = mk(w, h); g.drawImage(src, 0, 0, w, h); src = c; }
+  const [, g] = mk(72, 64); g.drawImage(src, 0, 0, 72, 64);
+  return g.getImageData(0, 0, 72, 64).data;
+}
+function fpFromImage(img) {
+  const d = fpPixels(img), grid = [];
+  for (let by = 0; by < 8; by++) { const row = [];
+    for (let bx = 0; bx < 9; bx++) { let s = 0;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const i = ((by * 8 + y) * 72 + bx * 8 + x) * 4; s += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; }
+      row.push(s / 64); }
+    grid.push(row); }
+  let bits = "", ones = 0;
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const b = grid[y][x] > grid[y][x + 1] ? 1 : 0; ones += b; bits += b; }
+  if (ones < 8 || ones > 56) return "";   // a nearly flat picture has too little detail to compare
+  let hex = ""; for (let i = 0; i < 64; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+  return hex;
+}
+const FP_POP = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+const fpValid = h => /^[0-9a-f]{16}$/.test(h || "");
+function fpDist(a, b) { let n = 0; for (let i = 0; i < 16; i++) n += FP_POP[parseInt(a[i], 16) ^ parseInt(b[i], 16)]; return n; }
+function fpLoad(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("unreadable")); im.src = src; }); }
+async function fpOfFile(file) { const url = URL.createObjectURL(file); try { return fpFromImage(await fpLoad(url)); } finally { URL.revokeObjectURL(url); } }
+
+const $ = id => document.getElementById(id);
+let PW = "", stopFlag = false;
+async function api(action, payload) {
+  let res;
+  try { res = await fetch(API, { method: "POST", body: JSON.stringify(Object.assign({ action }, payload)) }); }
+  catch (e) { throw new Error("Couldn't reach the web app. Please check your connection."); }
+  let out;
+  try { out = await res.json(); } catch (e) { throw new Error("The web app sent an unexpected reply. Check that the newest version is deployed."); }
+  if (!out.ok) throw new Error(out.error || "Something went wrong.");
+  return out;
+}
+$("gate").onsubmit = async e => {
+  e.preventDefault(); $("gerr").textContent = ""; $("gbtn").disabled = true;
+  try { await api("check", { password: $("pw").value }); PW = $("pw").value; $("gate").hidden = true; $("tool").hidden = false; }
+  catch (err) { $("gerr").textContent = err.message; }
+  $("gbtn").disabled = false;
+};
+$("stop").onclick = () => { stopFlag = true; $("stop").disabled = true; $("msg").textContent = "Stopping after this batch\u2026"; };
+$("go").onclick = async () => {
+  stopFlag = false; $("go").hidden = true; $("stop").hidden = false; $("stop").disabled = false;
+  const msg = $("msg"); msg.className = "msg"; msg.textContent = "Finding photos without a fingerprint\u2026";
+  let done = 0, plain = 0, failed = 0, total = 0;
+  const show = () => { $("bar").value = done + plain + failed; $("stats").textContent = done + " done, " + plain + " too plain to compare, " + failed + " couldn\u2019t be read (of " + total + ")"; };
+  try {
+    const ids = (await api("fpTodo", { password: PW })).ids; total = ids.length;
+    $("bar").max = Math.max(1, total); $("bar").hidden = false; show();
+    if (!total) { msg.textContent = "Every photo already has a fingerprint."; }
+    for (let i = 0; i < ids.length && !stopFlag; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH);
+      let thumbs;
+      try { thumbs = (await api("fpThumbs", { password: PW, ids: batch })).thumbs || {}; }
+      catch (err) { thumbs = (await api("fpThumbs", { password: PW, ids: batch })).thumbs || {}; }   // one retry
+      const items = [];
+      for (const id of batch) {
+        const t = thumbs[id];
+        if (!t) { failed++; continue; }
+        try { const h = fpFromImage(await fpLoad("data:" + t.type + ";base64," + t.data)); if (h) { items.push({ id, hash: h }); done++; } else { items.push({ id, hash: "-" }); plain++; } }
+        catch (e) { failed++; }
+      }
+      if (items.length) await api("fpSave", { password: PW, items });
+      show();
+    }
+    if (stopFlag) msg.textContent = "Stopped. Press Start to carry on later.";
+    else if (total) { msg.textContent = "Finished." + (failed ? " " + failed + " photo(s) couldn\u2019t be read and will be tried again next time." : "") + " Now run findDuplicatePhotos in Apps Script to see the results."; }
+  } catch (err) {
+    msg.className = "msg err"; msg.textContent = err.message + " Press Start to try again; nothing is lost.";
+  }
+  $("go").hidden = false; $("stop").hidden = true;
+};
+</script>
+</body>
+</html>

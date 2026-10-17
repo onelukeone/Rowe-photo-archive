@@ -64,6 +64,14 @@ ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
 [hidden]{display:none!important}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 @media(max-width:560px){.row2{grid-template-columns:1fr}}
+.card .dupwarn{display:flex;gap:12px;align-items:flex-start;margin:10px 0 0;padding:10px 12px;border:1px solid #d99a1e;background:rgba(217,154,30,.13);border-radius:10px;font:400 14px/1.4 var(--sans)}
+.card .dupwarn img{flex:none;width:64px;height:64px;border-radius:6px}
+.card .dupwarn b{display:block;margin-bottom:2px}
+.card .dupwarn .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.card .dupwarn button{font:600 13px var(--sans);padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.card .dupwarn button.go{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.card .dupok{margin:10px 0 0;font:500 13px var(--sans);color:var(--mute)}
+.card .dupok button{background:none;border:0;color:var(--acc);text-decoration:underline;cursor:pointer;font:inherit;padding:0 0 0 6px}
 </style>
 </head>
 <body>
@@ -175,6 +183,37 @@ function tagSuggest(inp,pool){
 }
 const normTags=v=>String(v||"").split(",").map(t=>t.trim()).filter(Boolean).join(", ");
 
+/* ---- photo fingerprint: a 64-bit "difference hash". The same picture gives (nearly) the same fingerprint,
+        even after it has been resized or re-saved. Used by the upload page and by the fingerprint tool. ---- */
+const FP_MAX_DIFF = 6;   // how many of the 64 bits may differ and still count as "looks the same"
+function fpPixels(img) {
+  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, src = img;
+  const mk = (cw, ch) => { const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+    const g = c.getContext("2d", { willReadFrequently: true }); g.fillStyle = "#fff"; g.fillRect(0, 0, cw, ch); g.imageSmoothingQuality = "high"; return [c, g]; };
+  while (w > 144 && h > 128) { w = Math.max(144, Math.ceil(w / 2)); h = Math.max(128, Math.ceil(h / 2)); const [c, g] = mk(w, h); g.drawImage(src, 0, 0, w, h); src = c; }
+  const [, g] = mk(72, 64); g.drawImage(src, 0, 0, 72, 64);
+  return g.getImageData(0, 0, 72, 64).data;
+}
+function fpFromImage(img) {
+  const d = fpPixels(img), grid = [];
+  for (let by = 0; by < 8; by++) { const row = [];
+    for (let bx = 0; bx < 9; bx++) { let s = 0;
+      for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const i = ((by * 8 + y) * 72 + bx * 8 + x) * 4; s += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; }
+      row.push(s / 64); }
+    grid.push(row); }
+  let bits = "", ones = 0;
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const b = grid[y][x] > grid[y][x + 1] ? 1 : 0; ones += b; bits += b; }
+  if (ones < 8 || ones > 56) return "";   // a nearly flat picture has too little detail to compare
+  let hex = ""; for (let i = 0; i < 64; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+  return hex;
+}
+const FP_POP = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
+const fpValid = h => /^[0-9a-f]{16}$/.test(h || "");
+function fpDist(a, b) { let n = 0; for (let i = 0; i < 16; i++) n += FP_POP[parseInt(a[i], 16) ^ parseInt(b[i], 16)]; return n; }
+function fpLoad(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("unreadable")); im.src = src; }); }
+async function fpOfFile(file) { const url = URL.createObjectURL(file); try { return fpFromImage(await fpLoad(url)); } finally { URL.revokeObjectURL(url); } }
+
+let EXISTING=[];   // photos already in the archive: { h: fingerprint, id, label }
 let TAGPOOL=[];
 function parseCSV(t){const out=[];let row=[],c="",q=false;
   for(let i=0;i<t.length;i++){const ch=t[i];
@@ -185,11 +224,28 @@ function parseCSV(t){const out=[];let row=[],c="",q=false;
 async function loadTags(){
   try{const res=await fetch(CSV_URL);if(!res.ok)return;
     const t=parseCSV(await res.text()),head=t[0].map(h=>h.trim().toLowerCase()),ti=head.indexOf("tags"),si=head.indexOf("status");
+    {const hi=head.indexOf("hash"),li=head.indexOf("photo link"),ni=head.indexOf("title"),fi=head.indexOf("file name");
+     if(hi>=0&&li>=0)EXISTING=t.slice(1).map(r=>({h:String(r[hi]||"").trim().toLowerCase(),id:(String(r[li]||"").match(/[-\w]{25,}/)||[""])[0],
+       label:String(r[ni]||"").trim()||String(r[fi]||"").trim()||"a photo in the archive"})).filter(x=>fpValid(x.h)&&x.id);
+     queue.forEach(checkAgainstArchive);rerender()}
     if(ti<0)return;const c=new Map();
     t.slice(1).forEach(r=>{if(si>=0&&(r[si]||"").trim().toLowerCase()!=="approved")return;
       String(r[ti]||"").split(",").forEach(x=>{x=x.trim();if(!x)return;const k=x.toLowerCase(),e=c.get(k)||{n:0,f:{}};e.n++;e.f[x]=(e.f[x]||0)+1;c.set(k,e)})});
     TAGPOOL=[...c.values()].sort((a,b)=>b.n-a.n).map(e=>Object.entries(e.f).sort((a,b)=>b[1]-a[1])[0][0])}catch(e){}}
 let PW = "", queue = [], wasMulti = false;
+// Redraws the list without losing the cursor if the person is typing in one of the photo\u2019s fields
+function rerender() {
+  const a = document.activeElement, id = a && a.id, s = a && a.selectionStart, e = a && a.selectionEnd;
+  render();
+  if (id) { const n = document.getElementById(id); if (n && n !== a) { n.focus(); try { n.setSelectionRange(s, e); } catch (_) {} } }
+}
+function checkAgainstArchive(it) {
+  it.dup = null;
+  if (!it.hash || !EXISTING.length) return;
+  let best = null;
+  EXISTING.forEach(e => { const d = fpDist(it.hash, e.h); if (d <= FP_MAX_DIFF && (!best || d < best.dist)) best = { id: e.id, label: e.label, dist: d }; });
+  it.dup = best;
+}
 const ID_KEY = "rowe-visitor";
 function getId() { try { const o = JSON.parse(localStorage.getItem(ID_KEY) || "null"); return o && o.name && o.email ? o : null; } catch (e) { return null; } }
 (function () { const i = getId(); if (i) { $("name").value = i.name; $("email").value = i.email; } })();
@@ -218,7 +274,9 @@ $("gate").onsubmit = async e => {
 $("files").onchange = e => {
   for (const f of e.target.files) {
     if (queue.length >= MAX_FILES) { $("status").textContent = "You can send up to " + MAX_FILES + " photos at a time."; break; }
-    if (f.type.startsWith("image/")) queue.push({ file: f, title: "", date: "", program: "", people: "", tags: "", comments: "", open: false });
+    if (f.type.startsWith("image/")) { const it = { file: f, title: "", date: "", program: "", people: "", tags: "", comments: "", open: false, hash: undefined, dup: null, keep: false };
+      it.hashP = fpOfFile(f).catch(() => "").then(h => { it.hash = h; checkAgainstArchive(it); rerender(); return h; });
+      queue.push(it); }
   }
   e.target.value = ""; render();
 };
@@ -273,6 +331,26 @@ function render() {
       cp.onclick = () => copyToAll(it);
       body.appendChild(cp);
     }
+    // Possible duplicate: of a photo already in the archive, or of an earlier photo in this batch
+    const d = it.dup || (() => { const j = queue.findIndex((o, k) => k < i && it.hash && o.hash && fpDist(it.hash, o.hash) <= FP_MAX_DIFF);
+                                  return j >= 0 ? { batch: true, label: queue[j].file.name } : null; })();
+    if (d) {
+      if (it.keep) {
+        const ok = document.createElement("p"); ok.className = "dupok"; ok.textContent = "Marked as different. It will be sent.";
+        const un = document.createElement("button"); un.type = "button"; un.textContent = "Undo"; un.onclick = () => { it.keep = false; render(); };
+        ok.appendChild(un); body.appendChild(ok);
+      } else {
+        const w = document.createElement("div"); w.className = "dupwarn"; w.setAttribute("role", "alert");
+        if (d.id) { const th = new Image(); th.alt = ""; th.referrerPolicy = "no-referrer"; th.src = "https://drive.google.com/thumbnail?id=" + d.id + "&sz=w160"; th.onerror = () => th.remove(); w.appendChild(th); }
+        const tx = document.createElement("div");
+        const hb = document.createElement("b"); hb.textContent = d.batch ? "This looks the same as another photo you chose." : "This may already be in the archive.";
+        const ln = document.createElement("span"); ln.textContent = d.batch ? "It looks like \u201c" + d.label + "\u201d in this list." : "It looks like \u201c" + d.label + "\u201d, which is already there.";
+        const ac = document.createElement("div"); ac.className = "acts";
+        const keep = document.createElement("button"); keep.type = "button"; keep.textContent = "It\u2019s different, send it"; keep.onclick = () => { it.keep = true; render(); };
+        const drop = document.createElement("button"); drop.type = "button"; drop.className = "go"; drop.textContent = "Don\u2019t send this one"; drop.onclick = () => { queue.splice(queue.indexOf(it), 1); render(); };
+        ac.append(drop, keep); tx.append(hb, ln, ac); w.appendChild(tx); body.appendChild(w);
+      }
+    }
     const b = document.createElement("button"); b.type = "button"; b.className = "rm"; b.textContent = "\u00d7";
     b.setAttribute("aria-label", "Remove " + it.file.name);
     b.onclick = () => { queue.splice(i, 1); render(); };
@@ -306,6 +384,9 @@ $("main").onsubmit = async e => {
   e.preventDefault();
   const st = $("status"); st.className = "msg"; st.textContent = "";
   if (!queue.length) { st.className = "msg err"; st.textContent = "Please choose at least one photo."; return; }
+  await Promise.all(queue.map(q => q.hashP));
+  const unresolved = queue.filter((q, k) => !q.keep && (q.dup || queue.some((o, j) => j < k && q.hash && o.hash && fpDist(q.hash, o.hash) <= FP_MAX_DIFF)));
+  if (unresolved.length) { st.className = "msg err"; st.textContent = unresolved.length === 1 ? "One photo looks like a duplicate. Please choose \u201cDon\u2019t send this one\u201d or \u201cIt\u2019s different, send it\u201d on that photo." : unresolved.length + " photos look like duplicates. Please choose what to do with each one marked above."; return; }
   const meta = { name: $("name").value, email: $("email").value, date: $("date").value, program: $("program").value,
     people: $("people").value, tags: normTags($("tags").value), comments: $("comments").value, title: $("title").value, rights: $("rights").checked };
   $("send").disabled = true;
@@ -315,7 +396,7 @@ $("main").onsubmit = async e => {
       const it = queue[0], f = it.file;
       st.textContent = "Uploading " + (done + 1) + " of " + total + "\u2026";
       const data = await shrink(f);
-      await api("upload", { password: PW, meta: perPhoto(meta, it, multi), file: { name: f.name.replace(/\.[^.]+$/, "") + ".jpg", data } });
+      await api("upload", { password: PW, meta: Object.assign({}, perPhoto(meta, it, multi), { hash: it.hash || "" }), file: { name: f.name.replace(/\.[^.]+$/, "") + ".jpg", data } });
       queue.shift(); done++; render();
     }
     await api("finish", { password: PW, meta, count: done });
