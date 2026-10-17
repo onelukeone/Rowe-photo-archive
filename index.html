@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>Rowe Camp Photo Archive</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12161b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rowe Photos">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Fondamento&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f4f5f7;--ink:#101820;--mute:#5b6570;--line:#d3d7de;--acc:#2440d9;--acc-ink:#fff;--tint:#dfe3f5;
@@ -83,8 +93,15 @@ aside h3{font:800 34px/.95 var(--sans);letter-spacing:-.03em;margin:0 0 18px}
 aside dl{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;margin:0 0 18px;font-size:15px}
 aside dt{color:#9aa4af;font:500 13px var(--sans);padding-top:2px}
 aside dd{margin:0;overflow-wrap:anywhere}
-.sg{margin-top:20px;border-top:1px solid #2b333b;padding-top:14px}
-.sg summary{cursor:pointer;font:600 14px var(--sans);color:#9fb0ff}
+.sg{margin:22px 0 0;background:#1b2447;border:1px solid #6f82ff;border-radius:14px;padding:0 16px 16px}
+.sg summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 12px;padding:14px 0 0}
+.sg summary::-webkit-details-marker{display:none}
+.sg summary .sgt{flex:1 1 190px;display:flex;flex-direction:column;gap:2px;font:600 16px var(--sans);color:#eceff3}
+.sg summary .sgt small{font:400 13px var(--sans);color:#b5bfd9}
+.sg summary .sgp{flex:none;background:#9fb0ff;color:#0c1014;border-radius:99px;padding:8px 14px;font:600 14px var(--sans)}
+.sg[open] summary .sgp{background:transparent;color:#9fb0ff;border:1px solid #6f82ff;padding:7px 13px}
+.sg:not([open]){padding-bottom:0}
+.sg:not([open]) summary{padding-bottom:14px}
 .sg label{display:block;font:500 13px var(--sans);color:#9aa4af;margin:12px 0 4px}
 .sg textarea,.sg select,.sg input[type=email],.sg input[type=password],.sg input[type=text]{width:100%;background:#161c21;color:#eceff3;border:1px solid #2b333b;border-radius:8px;padding:9px 10px;font:15px var(--serif)}
 .sg textarea{min-height:70px;resize:vertical}
@@ -148,6 +165,7 @@ aside a{color:#9fb0ff}
 <section class="wrap tb" aria-label="Search, sort and filter">
   <div class="row">
     <input id="q" type="search" placeholder="Search title, people, description" aria-label="Search">
+    <select id="qf" aria-label="Search in"></select>
     <label class="lab" for="sf">Sort</label><select id="sf"></select>
     <button class="btn" id="dir"></button>
     <label class="lab" for="gf">Group</label><select id="gf"></select>
@@ -204,7 +222,7 @@ const PROGS=["Senior High Camp","Junior High Camp","YPC","Other Youth Camps","Co
 const DECS=["1920s","1930s","1940s","1950s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
 const decOf=r=>{if(/^\d{4}/.test(r.date))return r.date.slice(0,3)+"0s";const m=(r.era||"").match(/^(\d{3})0s/i);return m?m[1]+"0s":""};
 const sub=r=>[r.date||r.era,r.coll].filter(Boolean).join(" - ");
-const st = {q:"", sf:"date", sd:1, gf:"", prog:new Set(), dec:new Set()};
+const st = {q:"", qf:"", sf:"date", sd:1, gf:"", prog:new Set(), dec:new Set()};
 
 /* ---- data ---- */
 function parseCSV(t){const out=[];let row=[],c="",inq=false;
@@ -255,10 +273,10 @@ async function load(){
 
 /* ---- state in URL so views can be shared ---- */
 function readHash(){const p=new URLSearchParams(location.hash.slice(1));
-  st.q=p.get("q")||"";st.sf=p.get("sort")||"date";st.sd=p.get("dir")==="-1"?-1:1;st.gf=p.get("group")||"";
+  st.q=p.get("q")||"";st.qf=SCOPES.some(x=>x[0]===p.get("in"))?p.get("in"):"";st.sf=p.get("sort")||"date";st.sd=p.get("dir")==="-1"?-1:1;st.gf=p.get("group")||"";
   st.prog=new Set((p.get("prog")||"").split("|").filter(Boolean));st.dec=new Set((p.get("dec")||"").split("|").filter(Boolean))}
 function writeHash(){const p=new URLSearchParams();
-  if(st.q)p.set("q",st.q);if(st.sf!=="date")p.set("sort",st.sf);if(st.sd===-1)p.set("dir","-1");
+  if(st.q)p.set("q",st.q);if(st.qf)p.set("in",st.qf);if(st.sf!=="date")p.set("sort",st.sf);if(st.sd===-1)p.set("dir","-1");
   if(st.gf)p.set("group",st.gf);if(st.prog.size)p.set("prog",[...st.prog].join("|"));
   if(st.dec.size)p.set("dec",[...st.dec].join("|"));
   try{history.replaceState(null,"",p.toString()?"#"+p:location.pathname+location.search)}catch(e){}}
@@ -275,6 +293,8 @@ async function loadContribs(){
     rows.forEach(r=>{r.contribs=byId[r.img]||[]});
     render();
   }catch(e){}}
+/* what the search box looks in: [field, menu label, text for the placeholder] */
+const SCOPES=[["","Everything",""],["people","People in photo","people in the photo"],["by","Photographer","photographer"],["tags","Tags","tags"],["notes","Description","description"],["title","Title","title"]];
 const tagsOf = r => r.tags.split(",").map(t=>t.trim().toLowerCase()).filter(Boolean);
 const val = (r,k) => k==="year"?(r.date.slice(0,4)||r.era):k==="decade"?decOf(r):k==="date"?(r.date||r.era):(r[k]||"");
 const uniq = k => [...new Set(rows.map(r=>r[k]).filter(Boolean))].sort();
@@ -282,9 +302,10 @@ const dirLabel = () => st.sf==="date"?(st.sd===1?"Oldest first":"Newest first"):
 
 function build(){
   $("sf").innerHTML=SORTABLE.map(f=>`<option value="${f[0]}">${f[1]}</option>`).join("");
+  $("qf").innerHTML=SCOPES.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join("");
   $("gf").innerHTML='<option value="">None</option>'+[["decade","Decade"],["year","Year"],["coll","Program"],["by","Photographer"]].map(f=>`<option value="${f[0]}">${f[1]}</option>`).join("");
 }
-function sync(){$("q").value=st.q;$("sf").value=st.sf;$("gf").value=st.gf;
+function sync(){$("q").value=st.q;$("qf").value=st.qf;$("q").placeholder=st.qf?"Search "+SCOPES.find(x=>x[0]===st.qf)[2]:"Search title, people, description";$("sf").value=st.sf;$("gf").value=st.gf;
   const n=st.prog.size+st.dec.size;
   $("fbtn").textContent=n?`Filters (${n})`:"Filters"}
 function render(){
@@ -293,7 +314,9 @@ function render(){
   $("fprog").innerHTML=PROGS.map(v=>chip("data-p",v,rows.filter(r=>r.coll.toLowerCase()===v.toLowerCase()).length)).join("");
   $("fdec").innerHTML=DECS.map(v=>chip("data-d",v,rows.filter(r=>decOf(r)===v).length)).join("");
   const list=rows.filter(r=>{
-    if(st.q&&!F.some(f=>r[f[0]].toLowerCase().includes(st.q.toLowerCase()))&&!(r.contribs||[]).some(c=>c.text.toLowerCase().includes(st.q.toLowerCase())))return false;
+    if(st.q){const q=st.q.toLowerCase(),has=t=>String(t||"").toLowerCase().includes(q),inContribs=()=>(r.contribs||[]).some(c=>has(c.text));
+      const hit=st.qf?(has(r[st.qf])||(st.qf==="notes"&&inContribs())):(F.some(f=>has(r[f[0]]))||inContribs());
+      if(!hit)return false}
     if(st.prog.size&&![...st.prog].some(v=>v.toLowerCase()===r.coll.toLowerCase()))return false;
     return !st.dec.size||st.dec.has(decOf(r))
   }).sort((a,b)=>String(val(a,st.sf)).localeCompare(String(val(b,st.sf)),undefined,{numeric:true,sensitivity:"base"})*st.sd);
@@ -423,11 +446,12 @@ async function loadDiscussion(){if(!CONFIG.suggestApiUrl)return;
 function suggestHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
   const cur=r.date||r.era||"",progs=(!r.coll||PROGS.includes(r.coll))?PROGS:PROGS.concat(r.coll);
   const f=(k,l,v,ph)=>`<label for="sg_${k}">${l}</label><input type="text" id="sg_${k}" name="${k}" value="${esc(v)}" data-orig="${esc(v)}" placeholder="${esc(ph||"")}" autocomplete="off">`;
-  return `<details class="sg"><summary>Suggest a change or add information</summary><form class="sgf" novalidate>
+  return `<details class="sg"><summary><span class="sgt">Know something about this photo?<small>Suggest a correction or add what you remember.</small></span><span class="sgp" aria-hidden="true">Suggest a change</span></summary><form class="sgf" novalidate>
 <p class="hint">Fix anything that looks wrong, or add what you know. Suggestions are reviewed before they appear.</p>
 ${f("title","Title",r.title)}
 ${f("date","Date or era",cur,"1992, June 1992, or 1980s")}
 <label for="sg_program">Program</label><select id="sg_program" name="program" data-orig="${esc(r.coll)}"><option value=""${r.coll?"":" selected"}>Not set</option>${progs.map(p=>`<option${p===r.coll?" selected":""}>${esc(p)}</option>`).join("")}</select>
+${f("photographer","Photographer",r.by,"First Last")}
 ${f("people","People in the photo",r.people,"First Last, First Last")}
 ${f("tags","Tags",r.tags,"canoeing, chapel, dinner")}
 <label for="sg_info">Add information about this photo</label><textarea id="sg_info" name="info" placeholder="Who, what, where, when, or any story behind the photo."></textarea>
@@ -440,7 +464,7 @@ ${pwSaved()?"":'<label for="sg_pw">Archive password *</label><input type="passwo
 function contribHTML(r){const c=r.contribs||[],a=addLink(r);if(!c.length&&!a)return "";
   return `<div class="cm"><h4>Added by visitors</h4>${c.length?c.map(x=>`<blockquote>${esc(x.text)}<cite>${esc([x.name||"Anonymous",whenTxt(x.when)].filter(Boolean).join(", "))}</cite></blockquote>`).join(""):'<p class="none">Nothing added yet.</p>'}${a}</div>`}
 function fillInfo(){const r=order[cur];$("ct").textContent=`${cur+1} of ${order.length}`;
-  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${detail(r)}</dl>${contribHTML(r)}${discHTML(r)}${suggestHTML(r)}`;
+  $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${detail(r)}</dl>${contribHTML(r)}${suggestHTML(r)}${discHTML(r)}`;
   const tg=$("sg_tags");if(tg){let pool=null;tagSuggest(tg,()=>pool||(pool=tagPool()))}}
 function preload(){[1,-1].forEach(d=>{const p=new Image;p.src=src(order[nxt(d)],1800)})}
 function slide(cp,np,dir){busy=true;cur=nxt(dir);fillInfo();curP=np;
@@ -514,13 +538,14 @@ document.addEventListener("keydown",e=>{if(!$("lb").open||/^(INPUT|TEXTAREA|SELE
 
 /* ---- controls ---- */
 $("q").oninput=e=>{st.q=e.target.value;render()};
+$("qf").onchange=e=>{st.qf=e.target.value;render()};
 $("sf").onchange=e=>{st.sf=e.target.value;render()};
 $("dir").onclick=()=>{st.sd*=-1;render()};
 $("gf").onchange=e=>{st.gf=e.target.value;render()};
 $("fbtn").onclick=()=>{const o=$("panel").classList.toggle("open");$("fbtn").setAttribute("aria-expanded",o);$("fbtn").setAttribute("aria-pressed",o)};
 $("panel").onclick=e=>{const b=e.target.closest("[data-p],[data-d]");if(!b)return;
   const set=b.dataset.p!==undefined?st.prog:st.dec,k=b.dataset.p??b.dataset.d;set.has(k)?set.delete(k):set.add(k);render()};
-$("clear").onclick=()=>{st.q="";st.prog.clear();st.dec.clear();render()};
+$("clear").onclick=()=>{st.q="";st.qf="";st.prog.clear();st.dec.clear();render()};
 $("out").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;openViewer(order.findIndex(r=>r.id==t.dataset.id));$("lb").showModal()};
 if(CONFIG.formUrl){$("addlink").href=CONFIG.formUrl;$("addlink").hidden=false}
 window.addEventListener("hashchange",()=>{readHash();if(rows.length)render()});
@@ -538,11 +563,11 @@ $("lb").addEventListener("submit",async e=>{
   const r=order[cur],msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),el=n=>f.elements[n],v=n=>el(n)?el(n).value.trim():"";
   if(v("website"))return;
   const s={photoId:r.img,name:v("who"),email:v("email"),info:v("info"),note:v("note")},cleared=[];
-  ["title","date","program","people","tags"].forEach(k=>{
+  ["title","date","program","photographer","people","tags"].forEach(k=>{
     let o=(el(k).dataset.orig||"").trim(),n=v(k);if(k==="tags"){o=normTags(o);n=normTags(n)}
     if(n===o)s[k]="";else if(n===""){s[k]="";cleared.push(k+" (was: "+o+")")}else s[k]=n});
   if(cleared.length)s.note=(s.note?s.note+"\n":"")+"Visitor cleared: "+cleared.join("; ");
-  if(!s.title&&!s.date&&!s.program&&!s.people&&!s.tags&&!s.info&&!s.note){msg.textContent="Nothing has been changed yet.";return}
+  if(!s.title&&!s.date&&!s.program&&!s.photographer&&!s.people&&!s.tags&&!s.info&&!s.note){msg.textContent="Nothing has been changed yet.";return}
   if(!s.name){msg.textContent="Please enter your name.";return}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.email)){msg.textContent="Please enter a valid email address.";return}
   const pw=pwSaved()||v("pw");

@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>Add More Photos | Rowe Camp Photo Archive</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12161b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rowe Photos">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Fondamento&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#f4f5f7;--ink:#101820;--mute:#5b6570;--line:#d3d7de;--acc:#2440d9;--acc-ink:#fff;--card:#fff;
@@ -101,7 +111,7 @@ ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
     <label for="tags">Other tags <span class="opt">(optional)</span></label>
     <input type="text" id="tags" placeholder="canoeing, chapel, dinner">
 
-    <label for="comments">Comments or further description <span class="opt">(optional)</span></label>
+    <label for="comments">Description <span class="opt">(optional)</span></label>
     <textarea id="comments" placeholder="Who, what, where, when, or any story behind the photo."></textarea>
 
     <label for="title">Title <span class="opt">(optional)</span></label>
@@ -247,7 +257,7 @@ function render() {
     if (multi) {
       const pf = document.createElement("div"); pf.className = "pf";
       [["title", "Title (optional)", "input"], ["date", "Date or era (if known)", "input"], ["program", "Program (if known)", "select"],
-       ["tags", "Other tags", "input"], ["people", "People in the photo (if known)", "input", "full"], ["comments", "Comments or further description", "textarea", "full"]
+       ["tags", "Other tags", "input"], ["people", "People in the photo (if known)", "input", "full"], ["comments", "Description", "textarea", "full"]
       ].forEach(([k, label, tag, cls]) => {
         const w = document.createElement("div"); w.className = "fw" + (cls ? " " + cls : "");
         const id = "pp" + i + k, lb = document.createElement("label"); lb.htmlFor = id; lb.textContent = label;
