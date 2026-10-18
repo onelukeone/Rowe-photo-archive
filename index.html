@@ -206,9 +206,10 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
     <p id="fgmsg" role="status"></p>
   </form>
   <form id="rform" hidden novalidate>
-    <p class="gnote">Tell us who you are and we'll email you a code once your request is approved.</p>
+    <p class="gnote">Tell us who you are and we'll email you a code once your request is approved. We'll also email you when your name is added to a photo.</p>
     <input id="rq_name" type="text" placeholder="Your name" aria-label="Your name" autocomplete="name" maxlength="100">
     <input id="rq_email" type="email" placeholder="Your email address" aria-label="Your email address" autocomplete="email" maxlength="200">
+    <input id="rq_era" type="text" placeholder="When were you at Rowe? e.g. 1985-1992 (optional)" aria-label="When were you at Rowe? (optional)" maxlength="100">
     <input id="rq_note" type="text" placeholder="How do you know Rowe? (optional)" aria-label="How do you know Rowe? (optional)" maxlength="500">
     <input class="hp" id="rq_web" tabindex="-1" autocomplete="off" aria-hidden="true">
     <button type="submit" id="rbtn">Request access</button>
@@ -671,7 +672,7 @@ function boot(){
     if(!n){m.textContent="Please enter your name.";return}
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)){m.textContent="Please enter a valid email address.";return}
     $("rbtn").disabled=true;m.textContent="Sending…";
-    try{await api("requestAccess",{request:{name:n,email:em,note:$("rq_note").value.trim(),website:$("rq_web").value}});
+    try{await api("requestAccess",{request:{name:n,email:em,era:$("rq_era").value.trim(),note:$("rq_note").value.trim(),website:$("rq_web").value}});
       $("rform").innerHTML='<p class="gnote">Thank you! Your request has been sent. You will be emailed a code once it is approved.</p>'}
     catch(err){m.textContent=err.message;$("rbtn").disabled=false}};
   const c0=fromLink||storedCode();
