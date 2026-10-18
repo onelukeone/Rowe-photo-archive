@@ -377,16 +377,16 @@ function clampZ(p){const st=$("stage"),mx=Math.max(0,(p.offsetWidth*p._s-st.clie
   p._x=Math.min(mx,Math.max(-mx,p._x));p._y=Math.min(my,Math.max(-my,p._y))}
 function resetZ(p,anim){p._s=1;p._x=0;p._y=0;p.classList.remove("z");p.style.transformOrigin="";applyZ(p,anim)}
 /* ---- keyword suggestions: type freely, or pick from tags already in the archive ---- */
-function tagSuggest(inp,pool){
+function tagSuggest(inp,pool,single){
   const wrap=document.createElement("div");wrap.className="ac";
   inp.parentNode.insertBefore(wrap,inp);wrap.appendChild(inp);
   const ul=document.createElement("ul");ul.className="acl";ul.id=(inp.id||"tg"+Math.random().toString(36).slice(2))+"_list";ul.setAttribute("role","listbox");ul.hidden=true;wrap.appendChild(ul);
   inp.setAttribute("role","combobox");inp.setAttribute("aria-autocomplete","list");inp.setAttribute("aria-expanded","false");inp.setAttribute("aria-controls",ul.id);inp.autocomplete="off";
   let items=[],sel=-1;
-  const split=()=>{const v=inp.value,i=v.lastIndexOf(",");return{head:v.slice(0,i+1),cur:v.slice(i+1).trim()}};
+  const split=()=>{const v=inp.value,i=single?-1:v.lastIndexOf(",");return{head:v.slice(0,i+1),cur:v.slice(i+1).trim()}};
   const close=()=>{ul.hidden=true;inp.setAttribute("aria-expanded","false");sel=-1};
   const mark=()=>{[...ul.children].forEach((li,i)=>{li.setAttribute("aria-selected",i===sel);if(i===sel)li.scrollIntoView({block:"nearest"})})};
-  const pick=t=>{const{head}=split();inp.value=(head?head.replace(/\s*$/," "):"")+t+", ";close();inp.focus();inp.dispatchEvent(new Event("input",{bubbles:true}))};
+  const pick=t=>{const{head}=split();inp.value=single?t:(head?head.replace(/\s*$/," "):"")+t+", ";close();inp.focus();inp.dispatchEvent(new Event("input",{bubbles:true}))};
   const show=()=>{const{head,cur}=split(),q=cur.toLowerCase();
     if(!q){close();return}
     const have=new Set(head.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean));
@@ -408,6 +408,10 @@ function tagSuggest(inp,pool){
 const normTags=v=>String(v||"").split(",").map(t=>t.trim()).filter(Boolean).join(", ");
 function tagPool(){const c=new Map();
   rows.forEach(r=>String(r.tags||"").split(",").forEach(t=>{t=t.trim();if(!t)return;const k=t.toLowerCase(),e=c.get(k)||{n:0,f:{}};e.n++;e.f[t]=(e.f[t]||0)+1;c.set(k,e)}));
+  return [...c.values()].sort((a,b)=>b.n-a.n).map(e=>Object.entries(e.f).sort((a,b)=>b[1]-a[1])[0][0])}
+/* names already in the archive (People and Photographer columns), most-used first, for the suggestion form */
+function namePool(){const c=new Map(),add=v=>String(v||"").split(/[,;]/).forEach(t=>{t=t.trim().replace(/\s+/g," ");if(t.length<2)return;const k=t.toLowerCase(),e=c.get(k)||{n:0,f:{}};e.n++;e.f[t]=(e.f[t]||0)+1;c.set(k,e)});
+  rows.forEach(r=>{add(r.people);add(r.by)});
   return [...c.values()].sort((a,b)=>b.n-a.n).map(e=>Object.entries(e.f).sort((a,b)=>b[1]-a[1])[0][0])}
 function pane(r){const d=document.createElement("div");d.className="pane";
   const pic=document.createElement("img");pic.dataset.id=r.img||"";pic.dataset.w=1800;pic.onerror=()=>fb(pic);pic.src=src(r,1800);pic.alt=r.title||"";pic.referrerPolicy="no-referrer";pic.draggable=false;pic._s=1;pic._x=0;pic._y=0;
@@ -489,7 +493,10 @@ function contribHTML(r){const c=r.contribs||[],a=addLink(r);if(!c.length&&!a)ret
   return `<div class="cm"><h4>Added by visitors</h4>${c.length?c.map(x=>`<blockquote>${esc(x.text)}<cite>${esc([x.name||"Anonymous",whenTxt(x.when)].filter(Boolean).join(", "))}</cite></blockquote>`).join(""):'<p class="none">Nothing added yet.</p>'}${a}</div>`}
 function fillInfo(){const r=order[cur];$("ct").textContent=`${cur+1} of ${order.length}`;
   $("side").innerHTML=`<h3>${esc(r.title||"Untitled")}</h3><dl>${detail(r)}</dl>${contribHTML(r)}${suggestHTML(r)}${discHTML(r)}`;
-  const tg=$("sg_tags");if(tg){let pool=null;tagSuggest(tg,()=>pool||(pool=tagPool()))}}
+  const tg=$("sg_tags");if(tg){let pool=null;tagSuggest(tg,()=>pool||(pool=tagPool()))}
+  let names=null;const np=()=>names||(names=namePool());
+  const pp=$("sg_people");if(pp)tagSuggest(pp,np);
+  const ph=$("sg_photographer");if(ph)tagSuggest(ph,np,true)}
 function preload(){[1,-1].forEach(d=>{const p=new Image;p.src=src(order[nxt(d)],1800)})}
 function slide(cp,np,dir){busy=true;cur=nxt(dir);fillInfo();curP=np;
   const t=DUR(),w=W();void np.offsetWidth;
