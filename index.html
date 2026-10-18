@@ -157,9 +157,9 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .tile img,.pane img{-webkit-user-drag:none}
 @media print{body>*{display:none!important}body::before{content:"Printing is turned off for this archive.";display:block;padding:40px;font:16px sans-serif}}
 .gate .gnote{max-width:36ch;font:400 14px/1.45 var(--sans);color:var(--mute);margin:0}
-#rform{max-width:420px;width:100%}
-#rform[hidden]{display:none}
-#rform input{flex:1 1 100%}
+#rform,#fform{max-width:420px;width:100%}
+#rform[hidden],#fform[hidden]{display:none}
+#rform input,#fform input{flex:1 1 100%}
 #rmsg{flex:1 1 100%;min-height:1.4em;margin:0;font:400 14px/1.4 var(--sans);color:var(--mute)}
 .sob,.gate .sob{background:none;border:0;border-radius:0;color:var(--acc);text-decoration:underline;cursor:pointer;padding:0;font:500 14px var(--sans)}
 #foot .sob{color:var(--mute);font-size:13px}
@@ -197,6 +197,14 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   <p id="gerr" role="alert"></p>
   <p class="gnote">Your personal access code was emailed to you.</p>
   <button type="button" class="sob" id="reqlink">Don't have a code? Request access</button>
+  <button type="button" class="sob" id="fglink">Forgot your code?</button>
+  <form id="fform" hidden novalidate>
+    <p class="gnote">Enter the email address you were invited with. If it's on our list, we'll email your code again.</p>
+    <input id="fg_email" type="email" placeholder="Your email address" aria-label="Your email address" autocomplete="email" maxlength="200">
+    <input class="hp" id="fg_web" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <button type="submit" id="fgbtn">Email me my code</button>
+    <p id="fgmsg" role="status"></p>
+  </form>
   <form id="rform" hidden novalidate>
     <p class="gnote">Tell us who you are and we'll email you a code once your request is approved.</p>
     <input id="rq_name" type="text" placeholder="Your name" aria-label="Your name" autocomplete="name" maxlength="100">
@@ -253,8 +261,11 @@ function isoDate(s){s=(s||"").trim().replace(/^(\d),(\d{3})$/,"$1$2");const m=s.
   return m?`${m[3]}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`:s}
 const driveId = s => ((s||"").match(/[-\w]{25,}/)||[""])[0];
 const src = (r,w) => r.data || `https://drive.google.com/thumbnail?id=${r.img}&sz=w${w}`;
-function fb(i){const id=i.dataset.id;if(!id)return;const w=i.dataset.w||700,s=+(i.dataset.s||0)+1;i.dataset.s=s;
-  const u=[`https://lh3.googleusercontent.com/d/${id}=w${w}`,`https://drive.google.com/uc?export=view&id=${id}`];
+function fb(i){const id=i.dataset.id;if(!id)return;const w=+(i.dataset.w||700),s=+(i.dataset.s||0)+1;i.dataset.s=s;
+  /* if the big version can't be fetched, step down to smaller ones rather than giving up */
+  const u=[];if(w>1200)u.push(`https://drive.google.com/thumbnail?id=${id}&sz=w1200`);
+  u.push(`https://lh3.googleusercontent.com/d/${id}=w${w}`,`https://drive.google.com/uc?export=view&id=${id}`);
+  if(w>700)u.push(`https://drive.google.com/thumbnail?id=${id}&sz=w700`);
   if(s<=u.length)i.src=u[s-1];else{i.removeAttribute("src");i.parentElement.classList.add("bad")}}
 
 function art(n){const h=(n*67)%360;
@@ -640,6 +651,14 @@ function boot(){
   document.body.classList.add("locked");$("gate").hidden=false;
   $("gform").onsubmit=e=>{e.preventDefault();signIn($("pw").value)};
   $("reqlink").onclick=()=>{const r=$("rform");r.hidden=!r.hidden;if(!r.hidden)$("rq_name").focus()};
+  $("fglink").onclick=()=>{const f=$("fform");f.hidden=!f.hidden;if(!f.hidden)$("fg_email").focus()};
+  $("fform").onsubmit=async e=>{e.preventDefault();
+    const m=$("fgmsg"),em=$("fg_email").value.trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)){m.textContent="Please enter a valid email address.";return}
+    $("fgbtn").disabled=true;m.textContent="Sending…";
+    try{await api("forgotCode",{request:{email:em,website:$("fg_web").value}});
+      $("fform").innerHTML='<p class="gnote">Thank you. If that address is on our list, your code is on its way. It can take a few minutes to arrive, so check your spam folder too.</p>'}
+    catch(err){m.textContent=err.message;$("fgbtn").disabled=false}};
   $("rform").onsubmit=async e=>{e.preventDefault();
     const m=$("rmsg"),n=$("rq_name").value.trim(),em=$("rq_email").value.trim();
     if(!n){m.textContent="Please enter your name.";return}
