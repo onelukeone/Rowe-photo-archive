@@ -505,11 +505,11 @@ function suggestHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
   const f=(k,l,v,ph)=>`<label for="sg_${k}">${l}</label><input type="text" id="sg_${k}" name="${k}" value="${esc(v)}" data-orig="${esc(v)}" placeholder="${esc(ph||"")}" autocomplete="off">`;
   return `<details class="sg"><summary><span class="sgt">Know something about this photo?<small>Suggest a correction or add what you remember.</small></span><span class="sgp" aria-hidden="true">Suggest a change</span></summary><form class="sgf" novalidate>
 <p class="hint">Fix anything that looks wrong, or add what you know. Suggestions are reviewed before they appear.</p>
-${f("title","Title",r.title)}
+${f("people","People in the photo",r.people,"First Last, First Last")}
 ${f("date","Date or era",cur,"1992, June 1992, or 1980s")}
 <label for="sg_program">Program</label><select id="sg_program" name="program" data-orig="${esc(r.coll)}"><option value=""${r.coll?"":" selected"}>Not set</option>${progs.map(p=>`<option${p===r.coll?" selected":""}>${esc(p)}</option>`).join("")}</select>
 ${f("photographer","Photographer",r.by,"First Last")}
-${f("people","People in the photo",r.people,"First Last, First Last")}
+${f("title","Title",r.title)}
 ${f("tags","Tags",r.tags,"canoeing, chapel, dinner")}
 <label for="sg_info">Add information about this photo</label><textarea id="sg_info" name="info" placeholder="Who, what, where, when, or any story behind the photo."></textarea>
 <p class="hint">This is added to the photo's description.</p>
