@@ -44,6 +44,25 @@ h1{white-space:nowrap;font:400 clamp(24px,4.8vw,72px)/1.1 "Fondamento","Palatino
 .chip[aria-pressed=true]{background:var(--tint);border-color:var(--acc);color:var(--ink)}
 .status{display:flex;gap:12px;align-items:center;padding-top:14px;padding-bottom:4px;font:500 14px var(--sans);color:var(--mute)}
 .clear{background:none;border:0;color:var(--acc);text-decoration:underline;cursor:pointer;padding:0;font:500 14px var(--sans)}
+/* timeline */
+.tl{padding-top:8px;padding-bottom:6px}
+.tl[hidden]{display:none}
+.tlh{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-bottom:4px;font:500 14px var(--sans);color:var(--mute)}
+.tlh b{color:var(--ink);font:700 22px/1 var(--sans);letter-spacing:-.02em}
+.tlw{position:relative;padding:0 9px}
+.tlbars{display:flex;align-items:flex-end;gap:1px;height:44px}
+.tlbars i{flex:1;min-height:2px;border-radius:1px 1px 0 0;background:var(--tint)}
+.tlbars i.on{background:var(--acc)}
+#yr{-webkit-appearance:none;appearance:none;display:block;width:calc(100% + 18px);margin:0 -9px;height:28px;background:transparent;cursor:ew-resize;touch-action:none}
+#yr::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--line)}
+#yr::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}
+#yr::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--acc);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--acc);margin-top:-8px}
+#yr::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--acc);border:3px solid var(--bg);box-shadow:0 0 0 1px var(--acc)}
+.tl.off #yr::-webkit-slider-thumb{background:var(--mute);box-shadow:0 0 0 1px var(--mute)}
+.tl.off #yr::-moz-range-thumb{background:var(--mute);box-shadow:0 0 0 1px var(--mute)}
+.tl.off .tlbars i.on{background:var(--tint)}
+.tlax{position:relative;height:18px;font:500 12px var(--sans);color:var(--mute)}
+.tlax span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
 /* groups + varied grid */
 h2{font:800 clamp(33px,6.75vw,90px)/.9 var(--sans);letter-spacing:-.04em;margin:34px 0 12px;display:flex;align-items:baseline;gap:16px}
 h2 small{font:500 15px var(--sans);letter-spacing:0;color:var(--mute)}
@@ -181,6 +200,11 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   <a class="submit" id="addlink" href="#" hidden>Add More Photos</a>
 </header>
 
+<section class="wrap tl off" id="tl" aria-label="Timeline" hidden>
+  <div class="tlh"><span class="lab">Timeline</span><span id="tlread" aria-live="polite"></span><button type="button" class="clear" id="tlall" hidden>Show all years</button></div>
+  <div class="tlw"><div class="tlbars" id="tlbars" aria-hidden="true"></div><input type="range" id="yr" aria-label="Year" step="1"><div class="tlax" id="tlax" aria-hidden="true"></div></div>
+</section>
+
 <section class="wrap tb" aria-label="Search, sort and filter">
   <div class="row">
     <input id="q" type="search" placeholder="Search title, people, description" aria-label="Search">
@@ -265,7 +289,7 @@ const PROGS=["Senior High Camp","Junior High Camp","YPC","Other Youth Camps","Co
 const DECS=["1920s","1930s","1940s","1950s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
 const decOf=r=>{if(/^\d{4}/.test(r.date))return r.date.slice(0,3)+"0s";const m=(r.era||"").match(/^(\d{3})0s/i);return m?m[1]+"0s":""};
 const sub=r=>[r.date||r.era,r.coll].filter(Boolean).join(" - ");
-const st = {q:"", qf:"", sf:"date", sd:1, gf:"", prog:new Set(), dec:new Set()};
+const st = {q:"", qf:"", sf:"date", sd:1, gf:"", yr:0, prog:new Set(), dec:new Set()};
 
 /* ---- data ---- */
 function parseCSV(t){const out=[];let row=[],c="",inq=false;
@@ -314,11 +338,11 @@ function applyList(out){
 
 /* ---- state in URL so views can be shared ---- */
 function readHash(){const p=new URLSearchParams(location.hash.slice(1));
-  st.q=p.get("q")||"";st.qf=SCOPES.some(x=>x[0]===p.get("in"))?p.get("in"):"";st.sf=p.get("sort")||"date";st.sd=p.get("dir")==="-1"?-1:1;st.gf=p.get("group")||"";
+  st.q=p.get("q")||"";st.qf=SCOPES.some(x=>x[0]===p.get("in"))?p.get("in"):"";st.sf=p.get("sort")||"date";st.sd=p.get("dir")==="-1"?-1:1;st.gf=p.get("group")||"";st.yr=+(p.get("yr")||0)||0;if(TL&&(st.yr<TL.lo||st.yr>TL.hi))st.yr=0;
   st.prog=new Set((p.get("prog")||"").split("|").filter(Boolean));st.dec=new Set((p.get("dec")||"").split("|").filter(Boolean))}
 function writeHash(){const p=new URLSearchParams();
   if(st.q)p.set("q",st.q);if(st.qf)p.set("in",st.qf);if(st.sf!=="date")p.set("sort",st.sf);if(st.sd===-1)p.set("dir","-1");
-  if(st.gf)p.set("group",st.gf);if(st.prog.size)p.set("prog",[...st.prog].join("|"));
+  if(st.gf)p.set("group",st.gf);if(st.yr)p.set("yr",st.yr);if(st.prog.size)p.set("prog",[...st.prog].join("|"));
   if(st.dec.size)p.set("dec",[...st.dec].join("|"));
   try{history.replaceState(null,"",p.toString()?"#"+p:location.pathname+location.search)}catch(e){}}
 
@@ -341,6 +365,44 @@ const val = (r,k) => k==="year"?(r.date.slice(0,4)||r.era):k==="decade"?decOf(r)
 const uniq = k => [...new Set(rows.map(r=>r[k]).filter(Boolean))].sort();
 const dirLabel = () => st.sf==="date"?(st.sd===1?"Oldest first":"Newest first"):(st.sd===1?"A to Z":"Z to A");
 
+/* ---- timeline: drag the slider to move through the years ---- */
+const yearOf=r=>{const m=String(r.date||"").match(/\b(?:19|20)\d{2}\b/);return m?+m[0]:null};   // the exact year, when the photo has one
+const eraStart=r=>{const m=String(r.era||"").match(/^(\d{3})0s/i);return m?+m[1]*10:null};         // first year of a decade-only photo
+let TL=null;
+function tlInit(){
+  const counts={},eraC={},now=new Date().getFullYear();let lo=9999,hi=0;
+  rows.forEach(r=>{const y=yearOf(r);
+    if(y!==null){counts[y]=(counts[y]||0)+1;lo=Math.min(lo,y);hi=Math.max(hi,y)}
+    else{const d=eraStart(r);if(d!==null){eraC[d]=(eraC[d]||0)+1;lo=Math.min(lo,d);hi=Math.max(hi,Math.min(d+9,now))}}});
+  const sec=$("tl");
+  if(!(hi>lo)){sec.hidden=true;TL=null;st.yr=0;return}
+  const max=Math.max(1,...Object.values(counts)),n=hi-lo+1;
+  $("tlbars").innerHTML=Array.from({length:n},(_,k)=>{const y=lo+k,c=counts[y]||0;return `<i data-y="${y}" style="height:${c?Math.max(6,Math.round(c/max*100)):0}%" title="${y}: ${c} photo${c===1?"":"s"}"></i>`}).join("");
+  const labs=[];for(let d=Math.ceil(lo/10)*10;d<=hi;d+=10)labs.push(`<span style="left:${(d-lo)/(hi-lo)*100}%">${d}</span>`);
+  $("tlax").innerHTML=labs.join("");
+  const yr=$("yr");yr.min=lo;yr.max=hi;
+  TL={lo,hi,counts,eraC,t:0};
+  if(st.yr<lo||st.yr>hi)st.yr=0;
+  sec.hidden=false;tlSync()}
+function tlSync(){
+  if(!TL)return;
+  const on=!!st.yr,yr=$("yr");
+  $("tl").classList.toggle("off",!on);
+  yr.value=on?st.yr:TL.lo;yr.setAttribute("aria-valuetext",on?String(st.yr):"All years");
+  $("tlall").hidden=!on;
+  document.querySelectorAll("#tlbars i").forEach(i=>i.classList.toggle("on",on&&+i.dataset.y===st.yr));
+  if(!on){$("tlread").textContent="All years. Drag the slider to move through time.";return}
+  const d=Math.floor(st.yr/10)*10,a=TL.counts[st.yr]||0,e=TL.eraC[d]||0;
+  $("tlread").innerHTML=`<b>${st.yr}</b> ${a} photo${a===1?"":"s"}`+(e?`, plus ${e} known only as the ${d}s`:"")}
+function tlSettle(){document.querySelectorAll("img[data-pending]").forEach(i=>{i.src=i.dataset.pending;i.removeAttribute("data-pending")})}
+function tlWire(){
+  const yr=$("yr");let raf=0;
+  const pick=()=>{if(!TL)return;st.yr=+yr.value;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;render(true)});
+    clearTimeout(TL.t);TL.t=setTimeout(tlSettle,220)};   // while it is moving, photos draw without pictures; they load once it slows down
+  yr.addEventListener("pointerdown",()=>{if(!st.yr)pick()});
+  yr.addEventListener("input",pick);
+  yr.addEventListener("change",()=>{if(!TL)return;st.yr=+yr.value;if(raf){cancelAnimationFrame(raf);raf=0}render(true);writeHash();renderChips();tlSettle()});
+  $("tlall").onclick=()=>{st.yr=0;render()}}
 function build(){
   $("sf").innerHTML=SORTABLE.map(f=>`<option value="${f[0]}">${f[1]}</option>`).join("");
   $("qf").innerHTML=SCOPES.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join("");
@@ -348,34 +410,39 @@ function build(){
 }
 function sync(){$("q").value=st.q;$("qf").value=st.qf;$("q").placeholder=st.qf?"Search "+SCOPES.find(x=>x[0]===st.qf)[2]:"Search title, people, description";$("sf").value=st.sf;$("gf").value=st.gf;
   const n=st.prog.size+st.dec.size;
-  $("fbtn").textContent=n?`Filters (${n})`:"Filters"}
-function render(){
-  writeHash();sync();$("dir").textContent=dirLabel();
+  $("fbtn").textContent=n?`Filters (${n})`:"Filters";tlSync()}
+function renderChips(){
   const chip=(a,v,n)=>`<button class="chip" ${a}="${esc(v)}" aria-pressed="${(a==="data-p"?st.prog:st.dec).has(v)}"${n?"":' style="opacity:.5"'}>${esc(v)} ${n}</button>`;
   $("fprog").innerHTML=PROGS.map(v=>chip("data-p",v,rows.filter(r=>r.coll.toLowerCase()===v.toLowerCase()).length)).join("");
-  $("fdec").innerHTML=DECS.map(v=>chip("data-d",v,rows.filter(r=>decOf(r)===v).length)).join("");
+  $("fdec").innerHTML=DECS.map(v=>chip("data-d",v,rows.filter(r=>decOf(r)===v).length)).join("")}
+function render(quick){
+  if(!quick){writeHash();renderChips()}
+  sync();$("dir").textContent=dirLabel();
   const list=rows.filter(r=>{
     if(st.q){const q=st.q.toLowerCase(),has=t=>String(t||"").toLowerCase().includes(q),inContribs=()=>(r.contribs||[]).some(c=>has(c.text));
       const hit=st.qf?(has(r[st.qf])||(st.qf==="notes"&&inContribs())):(F.some(f=>has(r[f[0]]))||inContribs());
       if(!hit)return false}
     if(st.prog.size&&![...st.prog].some(v=>v.toLowerCase()===r.coll.toLowerCase()))return false;
+    if(st.yr){const y=yearOf(r);if(y!==null){if(y!==st.yr)return false}else{const d=eraStart(r);if(d===null||st.yr<d||st.yr>d+9)return false}}
     return !st.dec.size||st.dec.has(decOf(r))
   }).sort((a,b)=>String(val(a,st.sf)).localeCompare(String(val(b,st.sf)),undefined,{numeric:true,sensitivity:"base"})*st.sd);
-  const active=st.q||st.prog.size||st.dec.size;
+  const active=st.q||st.prog.size||st.dec.size||st.yr;
   $("count").textContent=`${list.length} ${list.length===1?"photo":"photos"}${active?` of ${rows.length}`:""}`;
   $("clear").hidden=!active;
   let groups=new Map();
-  list.forEach(r=>{const g=st.gf?(val(r,st.gf)||"Unknown"):"";if(!groups.has(g))groups.set(g,[]);groups.get(g).push(r)});
+  const yg=r=>yearOf(r)!==null?String(st.yr):Math.floor(st.yr/10)*10+"s (exact year not recorded)";
+  list.forEach(r=>{const g=st.gf?(val(r,st.gf)||"Unknown"):st.yr?yg(r):"";if(!groups.has(g))groups.set(g,[]);groups.get(g).push(r)});
   if(st.gf)groups=new Map([...groups].sort((a,b)=>a[0].localeCompare(b[0])*st.sd));
+  else if(st.yr)groups=new Map([...groups].sort((a,b)=>(/\(/.test(a[0])?1:0)-(/\(/.test(b[0])?1:0)));   // photos with a known year first
   order=[...groups.values()].flat();
   const label=SORTABLE.find(f=>f[0]===st.sf)[1];
   $("out").innerHTML=list.length?[...groups].map(([g,items])=>
     (g?`<h2>${esc(g)}<small>${items.length}</small></h2>`:"")+`<div class="grid">`+items.map((r,i)=>
-    `<button class="tile" data-id="${r.id}" aria-label="${esc(r.title||"Photo")}"><img src="${src(r,700)}" data-id="${r.img||""}" data-w="700" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer">${sub(r)?`<span><i>${esc(sub(r))}</i></span>`:""}</button>`).join("")+`</div>`).join("")
-    :'<p class="msg">No photos match these filters. Try removing a tag or clearing the search.</p>';
+    `<button class="tile" data-id="${r.id}" aria-label="${esc(r.title||"Photo")}"><img ${quick?`data-pending="${src(r,700)}"`:`src="${src(r,700)}"`} data-id="${r.img||""}" data-w="700" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer">${sub(r)?`<span><i>${esc(sub(r))}</i></span>`:""}</button>`).join("")+`</div>`).join("")
+    :`<p class="msg">${st.yr&&!st.q&&!st.prog.size&&!st.dec.size?`No photos from ${st.yr} yet. Keep sliding.`:"No photos match these filters. Try removing a tag or clearing the search."}</p>`;
 }
 function start(){
-  readHash();build();
+  readHash();build();tlInit();
   footer();
   render();
 }
@@ -604,7 +671,7 @@ $("gf").onchange=e=>{st.gf=e.target.value;render()};
 $("fbtn").onclick=()=>{const o=$("panel").classList.toggle("open");$("fbtn").setAttribute("aria-expanded",o);$("fbtn").setAttribute("aria-pressed",o)};
 $("panel").onclick=e=>{const b=e.target.closest("[data-p],[data-d]");if(!b)return;
   const set=b.dataset.p!==undefined?st.prog:st.dec,k=b.dataset.p??b.dataset.d;set.has(k)?set.delete(k):set.add(k);render()};
-$("clear").onclick=()=>{st.q="";st.qf="";st.prog.clear();st.dec.clear();render()};
+$("clear").onclick=()=>{st.q="";st.qf="";st.yr=0;st.prog.clear();st.dec.clear();render()};
 $("out").onclick=e=>{const t=e.target.closest(".tile");if(!t)return;openViewer(order.findIndex(r=>r.id==t.dataset.id));$("lb").showModal()};
 if(CONFIG.formUrl){$("addlink").href=CONFIG.formUrl;$("addlink").hidden=false}
 window.addEventListener("hashchange",()=>{readHash();if(rows.length)render()});
@@ -704,6 +771,7 @@ document.addEventListener("contextmenu",e=>{if(e.target.closest&&e.target.closes
 document.addEventListener("dragstart",e=>{if(e.target.tagName==="IMG")e.preventDefault()});
 document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&!e.altKey&&/^[sp]$/i.test(e.key))e.preventDefault()});
 $("foot").addEventListener("click",e=>{if(e.target.id==="signout")signOut();else if(e.target.id==="chname")openNameBox()});
+tlWire();
 boot();
 </script>
 </body>
