@@ -70,6 +70,15 @@ footer{padding-top:40px;padding-bottom:40px;color:var(--mute);font-size:14px}
 /* viewer */
 dialog{padding:0;border:0;width:100vw;height:100dvh;max-width:none;max-height:none;background:#0c1014;color:#eceff3}
 dialog::backdrop{background:#0c1014}
+#nb{width:min(92vw,420px);height:fit-content;max-height:90dvh;margin:auto;border-radius:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:22px 22px 18px}
+#nb::backdrop{background:rgba(0,0,0,.55)}
+#nb h2{margin:0 0 6px;font:600 20px/1.2 var(--sans)}
+#nb p{margin:0 0 12px;font:400 14px/1.45 var(--sans);color:var(--mute)}
+#nb #nb_msg{margin:8px 0 0;min-height:1.2em;color:#c0392b}
+#nb input{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--line);background:transparent}
+#nb .nbr{display:flex;align-items:center;gap:16px;margin-top:14px}
+#nb #nb_go{background:var(--acc);color:var(--acc-ink);border:0;border-radius:999px;padding:10px 20px;font:600 15px var(--sans);cursor:pointer}
+.opt{font-weight:400;color:var(--mute);font-size:.9em}
 .v{display:grid;grid-template-columns:1fr 340px;height:100%}
 .v.noinfo{grid-template-columns:1fr}
 .v.noinfo aside{display:none}
@@ -217,6 +226,13 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   </form>
 </div>
 <dialog id="lb" aria-label="Photo viewer"></dialog>
+<dialog id="nb" aria-labelledby="nb_t"><form id="nbf" novalidate>
+  <h2 id="nb_t">How should your name appear?</h2>
+  <p id="nb_p"></p>
+  <input id="nb_name" type="text" maxlength="60" autocomplete="name" aria-label="Your name">
+  <div class="nbr"><button type="submit" id="nb_go">Save</button><button type="button" class="sob" id="nb_cancel">Not now</button></div>
+  <p id="nb_msg" role="status"></p>
+</form></dialog>
 
 <script>
 /* ============ SETTINGS: edit this block only ============ */
@@ -360,9 +376,10 @@ function render(){
 }
 function start(){
   readHash();build();
-  $("foot").innerHTML=demo?"Sample data":'<button type="button" class="sob" id="signout">Sign out</button>';
+  footer();
   render();
 }
+function footer(){$("foot").innerHTML=demo?"Sample data":(myName()?'<button type="button" class="sob" id="chname">Change my name</button> · ':"")+'<button type="button" class="sob" id="signout">Sign out</button>'}
 
 /* ---- viewer: slide between photos, swipe on touch screens ---- */
 let curP=null,busy=false,nb=null,nbDir=0,dragging=false,tracking=false,tx=0,ty=0,tt=0;
@@ -427,19 +444,30 @@ function addLink(r){const u=CONFIG.contribFormUrl,e=CONFIG.contribPhotoEntry;if(
   let q="?usp=pp_url&"+encodeURIComponent(e)+"="+encodeURIComponent(r.img);
   if(CONFIG.contribTitleEntry)q+="&"+encodeURIComponent(CONFIG.contribTitleEntry)+"="+encodeURIComponent(r.title||"");
   return `<a class="addk" href="${esc(u+q)}" target="_blank" rel="noopener">Add what you know</a>`}
-/* ---- remember who is sending, on this device only ---- */
-const ID_KEY="rowe-visitor";
-function getId(){try{const o=JSON.parse(localStorage.getItem(ID_KEY)||"null");return o&&o.name&&o.email?o:null}catch(e){return null}}
-function setId(name,email){try{localStorage.setItem(ID_KEY,JSON.stringify({name,email}))}catch(e){}}
-function clearId(){try{localStorage.removeItem(ID_KEY)}catch(e){}}
-function idFields(p){p=p||"sg";return `<label for="${p}_name">Your name *</label><input type="text" id="${p}_name" name="who" autocomplete="name">
-<label for="${p}_email">Your email address *</label><input type="email" id="${p}_email" name="email" autocomplete="email">
-<p class="hint">${p==="dc"||p==="rp"?"Your name is shown with your message. Your email is kept private.":"Kept privately. It is not shown on the site."}</p>
-<label class="chk"><input type="checkbox" name="remember" checked> Remember my name and email on this device</label>`}
-function idHTML(p){p=p||"sg";const i=getId();
-  return i?`<p class="who">Sending as <b>${esc(i.name)}</b> (${esc(i.email)}) <button type="button" class="lnk" data-chg="${p}">Not you?</button></p><input type="hidden" name="who" value="${esc(i.name)}"><input type="hidden" name="email" value="${esc(i.email)}">`:idFields(p)}
-function refreshIds(){const i=getId();["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(!b||!i||b.querySelector(".who"))return;
-  if([...b.querySelectorAll("input[type=text],input[type=email]")].every(x=>!x.value))b.innerHTML=idHTML(q)})}
+/* ---- who is posting: a signed-in member is known by their access code; a test visitor can give a label ---- */
+let ME={name:"",test:false,needsName:false};
+const TESTNAME_KEY="rowe-testname";
+const testName=()=>{try{return localStorage.getItem(TESTNAME_KEY)||""}catch(e){return ""}};
+const testAsked=()=>{try{return localStorage.getItem(TESTNAME_KEY)!==null}catch(e){return true}};
+const setTestName=n=>{try{localStorage.setItem(TESTNAME_KEY,n)}catch(e){}};
+const myName=()=>ME.test?testName():ME.name;
+function idHTML(p){p=p||"sg";
+  return ME.test?`<label for="${p}_name">Your name <span class="opt">(optional)</span></label><input type="text" id="${p}_name" name="who" value="${esc(testName())}" autocomplete="name" maxlength="60">`
+    :`<p class="who">Posting as <b>${esc(ME.name||"you")}</b> <button type="button" class="lnk" data-chname="1">Change</button></p>`}
+function refreshWho(){["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(b)b.innerHTML=idHTML(q)});footer()}
+function openNameBox(){
+  $("nb_name").value=myName()||"";$("nb_msg").textContent="";
+  $("nb_p").textContent=ME.test?"Optional. It labels anything you write while you're testing.":"This is how your name will show on your suggestions and comments. Your email address is never shown.";
+  $("nb").showModal();$("nb_name").focus();$("nb_name").select()}
+$("nbf").onsubmit=async e=>{e.preventDefault();
+  const n=$("nb_name").value.trim().replace(/\s+/g," ");
+  if(ME.test){setTestName(n);$("nb").close();refreshWho();return}
+  if(!n){$("nb_msg").textContent="Please enter a name.";return}
+  $("nb_go").disabled=true;$("nb_msg").textContent="Saving…";
+  try{const out=await api("setName",{password:CODE,name:n});ME.name=out.name;ME.needsName=false;$("nb").close();refreshWho()}
+  catch(err){$("nb_msg").textContent=err.message}
+  $("nb_go").disabled=false};
+$("nb_cancel").onclick=()=>$("nb").close();
 /* ---- discussion: a message board for each photo ---- */
 let DISC=null;   // null = loading, "err" = could not load, otherwise { photoId: [messages] }
 const fmtDate=s=>{const d=new Date(s);return isNaN(d)?"":d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})};
@@ -595,45 +623,39 @@ $("lb").addEventListener("submit",async e=>{
   e.preventDefault();
   const r=order[cur],msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),el=n=>f.elements[n],v=n=>el(n)?el(n).value.trim():"";
   if(v("website"))return;
-  const s={photoId:r.img,name:v("who"),email:v("email"),info:v("info"),note:v("note")},cleared=[];
+  const s={photoId:r.img,name:ME.test?v("who"):"",info:v("info"),note:v("note")},cleared=[];
   ["title","date","program","photographer","people","tags"].forEach(k=>{
     let o=(el(k).dataset.orig||"").trim(),n=v(k);if(k==="tags"){o=normTags(o);n=normTags(n)}
     if(n===o)s[k]="";else if(n===""){s[k]="";cleared.push(k+" (was: "+o+")")}else s[k]=n});
   if(cleared.length)s.note=(s.note?s.note+"\n":"")+"Visitor cleared: "+cleared.join("; ");
   if(!s.title&&!s.date&&!s.program&&!s.photographer&&!s.people&&!s.tags&&!s.info&&!s.note){msg.textContent="Nothing has been changed yet.";return}
-  if(!s.name){msg.textContent="Please enter your name.";return}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(s.email)){msg.textContent="Please enter a valid email address.";return}
   const pw=pwSaved()||v("pw");
   if(!pw){msg.textContent="Please enter your access code.";return}
   btn.disabled=true;msg.textContent="Sending…";
   try{await api("suggest",{password:pw,suggestion:s});
-    const rm=el("remember");if(!getId()&&rm&&rm.checked)setId(s.name,s.email);
-    refreshIds();
+    if(ME.test)setTestName(s.name);
     f.innerHTML='<p class="sgm">Thank you! Your suggestion will appear after it has been reviewed.</p><button type="button" id="sg_again">Suggest another change</button>'}
   catch(err){msg.textContent=err.message;btn.disabled=false}});
 $("lb").addEventListener("click",e=>{
-  const c=e.target.dataset&&e.target.dataset.chg;
+  if(e.target.dataset&&e.target.dataset.chname){openNameBox();return}
   const rb=e.target.closest&&e.target.closest("[data-reply]"),rc=e.target.closest&&e.target.closest("[data-rcancel]");
   if(rb){const id=rb.dataset.reply;closeReplies();const sl=rb.parentElement;sl.innerHTML=replyForm(id);$("rp_text").focus();return}
   if(rc){closeReplies();return}
-  if(c){clearId();["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(b)b.innerHTML=idFields(q)});$(c+"_name").focus()}
-  else if(e.target.id==="sg_again"){fillInfo();const d=$("side").querySelector(".sg");if(d){d.open=true;d.scrollIntoView({block:"nearest"})}}});
+  if(e.target.id==="sg_again"){fillInfo();const d=$("side").querySelector(".sg");if(d){d.open=true;d.scrollIntoView({block:"nearest"})}}});
 $("lb").addEventListener("submit",async e=>{
   const f=e.target;if(!f.classList||!f.classList.contains("dcf"))return;
   e.preventDefault();
   const r=order[cur],msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),el=n=>f.elements[n],v=n=>el(n)?el(n).value.trim():"";
   if(v("website"))return;
-  const d={photoId:r.img,name:v("who"),email:v("email"),text:v("text")},isReply=!!f.dataset.parent;if(isReply)d.replyTo=f.dataset.parent;
+  const d={photoId:r.img,name:ME.test?v("who"):"",text:v("text")},isReply=!!f.dataset.parent;if(isReply)d.replyTo=f.dataset.parent;
   if(!d.text){msg.textContent="Please write a message first.";return}
-  if(!d.name){msg.textContent="Please enter your name.";return}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)){msg.textContent="Please enter a valid email address.";return}
   const pw=pwSaved()||v("pw");
   if(!pw){msg.textContent="Please enter your access code.";return}
   btn.disabled=true;msg.textContent="Posting…";
   try{const out=await api("discuss",{password:pw,discussion:d});
-    const rm=el("remember");if(!getId()&&rm&&rm.checked)setId(d.name,d.email);
+    if(ME.test)setTestName(d.name);
     if(out.approved&&out.post){if(!DISC||DISC==="err")DISC={};(DISC[r.img]=DISC[r.img]||[]).push(out.post);$("disc_list").innerHTML=discListHTML(r)}
-    el("text").value="";if(!isReply&&getId())$("dc_id").innerHTML=idHTML("dc");refreshIds();
+    el("text").value="";
     msg.textContent=out.approved?"Posted. Thank you!":isReply?"Thank you! Your reply will appear after it has been reviewed.":"Thank you! Your message will appear after it has been reviewed."}
   catch(err){msg.textContent=err.message}
   btn.disabled=false});
@@ -647,7 +669,8 @@ async function signIn(c){
   c=String(c||"").trim();if(!c)return;
   $("gerr").textContent="Signing in…";$("gbtn").disabled=true;
   try{const out=await api("list",{password:c});
-    CODE=c;storeCode(c);unlock();applyList(out)}
+    CODE=c;storeCode(c);ME=Object.assign({name:"",test:false,needsName:false},out.me||{});unlock();applyList(out);
+    if(ME.test?!testAsked():ME.needsName)openNameBox()}
   catch(err){if(err.kind==="auth")forgetCode();$("gerr").textContent=err.message;$("pw").focus()}
   $("gbtn").disabled=false}
 function boot(){
@@ -682,7 +705,7 @@ function boot(){
 document.addEventListener("contextmenu",e=>{if(e.target.closest&&e.target.closest("img,.tile,.pane"))e.preventDefault()});
 document.addEventListener("dragstart",e=>{if(e.target.tagName==="IMG")e.preventDefault()});
 document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&!e.altKey&&/^[sp]$/i.test(e.key))e.preventDefault()});
-$("foot").addEventListener("click",e=>{if(e.target.id==="signout")signOut()});
+$("foot").addEventListener("click",e=>{if(e.target.id==="signout")signOut();else if(e.target.id==="chname")openNameBox()});
 boot();
 </script>
 </body>
