@@ -452,8 +452,7 @@ const testAsked=()=>{try{return localStorage.getItem(TESTNAME_KEY)!==null}catch(
 const setTestName=n=>{try{localStorage.setItem(TESTNAME_KEY,n)}catch(e){}};
 const myName=()=>ME.test?testName():ME.name;
 function idHTML(p){p=p||"sg";
-  return ME.test?`<label for="${p}_name">Your name <span class="opt">(optional)</span></label><input type="text" id="${p}_name" name="who" value="${esc(testName())}" autocomplete="name" maxlength="60">`
-    :`<p class="who">Posting as <b>${esc(ME.name||"you")}</b> <button type="button" class="lnk" data-chname="1">Change</button></p>`}
+  return `<p class="who">Posting as <b>${esc(myName()||(ME.test?"Test visitor":"you"))}</b> <button type="button" class="lnk" data-chname="1">Change</button></p>`}
 function refreshWho(){["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(b)b.innerHTML=idHTML(q)});footer()}
 function openNameBox(){
   $("nb_name").value=myName()||"";$("nb_msg").textContent="";
@@ -623,7 +622,7 @@ $("lb").addEventListener("submit",async e=>{
   e.preventDefault();
   const r=order[cur],msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),el=n=>f.elements[n],v=n=>el(n)?el(n).value.trim():"";
   if(v("website"))return;
-  const s={photoId:r.img,name:ME.test?v("who"):"",info:v("info"),note:v("note")},cleared=[];
+  const s={photoId:r.img,name:ME.test?testName():"",info:v("info"),note:v("note")},cleared=[];
   ["title","date","program","photographer","people","tags"].forEach(k=>{
     let o=(el(k).dataset.orig||"").trim(),n=v(k);if(k==="tags"){o=normTags(o);n=normTags(n)}
     if(n===o)s[k]="";else if(n===""){s[k]="";cleared.push(k+" (was: "+o+")")}else s[k]=n});
@@ -633,7 +632,6 @@ $("lb").addEventListener("submit",async e=>{
   if(!pw){msg.textContent="Please enter your access code.";return}
   btn.disabled=true;msg.textContent="Sending…";
   try{await api("suggest",{password:pw,suggestion:s});
-    if(ME.test)setTestName(s.name);
     f.innerHTML='<p class="sgm">Thank you! Your suggestion will appear after it has been reviewed.</p><button type="button" id="sg_again">Suggest another change</button>'}
   catch(err){msg.textContent=err.message;btn.disabled=false}});
 $("lb").addEventListener("click",e=>{
@@ -647,13 +645,13 @@ $("lb").addEventListener("submit",async e=>{
   e.preventDefault();
   const r=order[cur],msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),el=n=>f.elements[n],v=n=>el(n)?el(n).value.trim():"";
   if(v("website"))return;
-  const d={photoId:r.img,name:ME.test?v("who"):"",text:v("text")},isReply=!!f.dataset.parent;if(isReply)d.replyTo=f.dataset.parent;
+  const d={photoId:r.img,name:ME.test?testName():"",text:v("text")},isReply=!!f.dataset.parent;if(isReply)d.replyTo=f.dataset.parent;
   if(!d.text){msg.textContent="Please write a message first.";return}
   const pw=pwSaved()||v("pw");
   if(!pw){msg.textContent="Please enter your access code.";return}
   btn.disabled=true;msg.textContent="Posting…";
   try{const out=await api("discuss",{password:pw,discussion:d});
-    if(ME.test)setTestName(d.name);
+
     if(out.approved&&out.post){if(!DISC||DISC==="err")DISC={};(DISC[r.img]=DISC[r.img]||[]).push(out.post);$("disc_list").innerHTML=discListHTML(r)}
     el("text").value="";
     msg.textContent=out.approved?"Posted. Thank you!":isReply?"Thank you! Your reply will appear after it has been reviewed.":"Thank you! Your message will appear after it has been reviewed."}
