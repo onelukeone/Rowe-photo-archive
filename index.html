@@ -17,9 +17,9 @@
 <meta name="apple-mobile-web-app-title" content="Rowe Photos">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Fondamento&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f4f5f7;--ink:#101820;--mute:#5b6570;--line:#d3d7de;--acc:#2440d9;--acc-ink:#fff;--tint:#dfe3f5;
+:root{--card:#fff;--bg:#f4f5f7;--ink:#101820;--mute:#5b6570;--line:#d3d7de;--acc:#2440d9;--acc-ink:#fff;--tint:#dfe3f5;
 --sans:"Bricolage Grotesque",system-ui,sans-serif;--serif:"Source Serif 4",Georgia,serif}
-@media (prefers-color-scheme:dark){:root{--bg:#12161b;--ink:#eceff3;--mute:#9aa4af;--line:#2b333b;--acc:#7f92ff;--acc-ink:#0b1030;--tint:#222a44}}
+@media (prefers-color-scheme:dark){:root{--card:#1a2027;--bg:#12161b;--ink:#eceff3;--mute:#9aa4af;--line:#2b333b;--acc:#7f92ff;--acc-ink:#0b1030;--tint:#222a44}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 var(--serif)}
 button,select,input{font:inherit;color:inherit}
@@ -191,6 +191,52 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 #rmsg{flex:1 1 100%;min-height:1.4em;margin:0;font:400 14px/1.4 var(--sans);color:var(--mute)}
 .sob,.gate .sob{background:none;border:0;border-radius:0;color:var(--acc);text-decoration:underline;cursor:pointer;padding:0;font:500 14px var(--sans)}
 #foot .sob{color:var(--mute);font-size:13px}
+/* latest discussions: a scrolling feed, one card per photo */
+.submit.alt{top:calc(clamp(18px,4vw,40px) + 52px);background:var(--bg);color:var(--acc);box-shadow:inset 0 0 0 2px var(--acc);padding:9px 16px;font-size:14px}
+#addlink[hidden]+#dlink{top:clamp(18px,4vw,40px)}
+body.vlatest .tb,body.vlatest #tl,body.vlatest .status,body.vlatest #out{display:none!important}
+#feed{max-width:680px;margin:0 auto;padding-bottom:48px}
+#feed[hidden]{display:none}
+.fhead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px;padding:22px 0 12px;border-top:2px solid var(--ink)}
+.fhead h2{font:700 26px/1.1 var(--sans);margin:0;letter-spacing:-.01em}
+.fhead p{flex:1 1 100%;margin:0;font:400 14px/1.4 var(--sans);color:var(--mute)}
+.fhead .lnk,.fc .lnk{background:none;border:0;padding:0;color:var(--acc);font:600 13px var(--sans);cursor:pointer}
+.fhead .lnk:hover,.fc .lnk:hover{text-decoration:underline}
+.fnone{color:var(--mute);font:italic 400 16px var(--serif);padding:24px 0}
+.fc{background:var(--card);border:1px solid var(--line);border-radius:14px;margin:0 0 18px;overflow:hidden}
+.fch{padding:14px 16px 12px}
+.fch h3{margin:0;font:700 19px/1.2 var(--sans)}
+.fch h3 button{all:unset;cursor:pointer}
+.fch h3 button:hover{text-decoration:underline}
+.fch p{margin:3px 0 0;font:500 13px var(--sans);color:var(--mute)}
+.fpic{display:block;width:100%;padding:0;border:0;background:#0c1014;cursor:pointer;line-height:0}
+.fpic img{display:block;width:100%;max-height:70vh;object-fit:contain;background:#0c1014}
+.fbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);font:500 13px var(--sans);color:var(--mute)}
+.fbar button{background:none;border:1px solid var(--acc);color:var(--acc);border-radius:99px;padding:6px 14px;font:600 13px var(--sans);cursor:pointer}
+.fbar button:hover{background:var(--acc);color:var(--acc-ink)}
+.fth{padding:12px 16px 4px}
+.fth>.lnk{display:block;margin:0 0 10px}
+.fm{display:flex;gap:9px;margin:0 0 10px}
+.fm.reply{margin-left:38px}
+.fm .av{flex:none;width:30px;height:30px;border-radius:50%;background:var(--tint);color:var(--acc);display:flex;align-items:center;justify-content:center;font:700 14px var(--sans)}
+.fm .bub{background:var(--bg);border-radius:14px;padding:7px 12px;min-width:0}
+.fm .bub b{display:block;font:700 13px var(--sans)}
+.fm .bub p{margin:1px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15.5px;line-height:1.4}
+.fm>div{min-width:0}
+.fmeta{display:flex;gap:12px;padding:2px 12px 0;font:500 12px var(--sans);color:var(--mute)}
+.fmeta .lnk{font-size:12px}
+.fth .rpslot{margin:0 0 6px 38px}
+.ffm{padding:6px 16px 14px}
+.ffm .row{display:flex;gap:8px;align-items:flex-end}
+.ffm textarea{flex:1;min-height:40px;max-height:200px;resize:vertical;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:20px;padding:9px 14px;font:15.5px/1.4 var(--serif)}
+.ffm button[type=submit]{flex:none;background:var(--acc);color:var(--acc-ink);border:0;border-radius:99px;padding:9px 16px;font:600 14px var(--sans);cursor:pointer}
+.ffm button:disabled{opacity:.6}
+.ffm .fdwho .who{margin:6px 0 0 4px;font:400 12px var(--sans);color:var(--mute)}
+.ffm .fdwho .lnk{font-size:12px;text-decoration:underline}
+.ffm .sgm{margin:4px 4px 0;min-height:1em;font:400 13px var(--sans);color:var(--mute)}
+.ffm.rpf{padding:2px 0 8px}
+.fend{text-align:center;color:var(--mute);font:400 13px var(--sans);margin:8px 0 0}
+@media(max-width:760px){.submit.alt{top:calc(clamp(18px,4vw,40px) + 46px);padding:8px 14px;font-size:13px}.fm.reply{margin-left:24px}.fth .rpslot{margin-left:24px}.fch h3{font-size:17px}}
 </style>
 </head>
 <body>
@@ -198,6 +244,7 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
   <div class="owl" role="img" aria-label="Flying owl"></div>
   <h1>Rowe Camp Photo Archive</h1>
   <a class="submit" id="addlink" href="#" hidden>Add More Photos</a>
+  <a class="submit alt" id="dlink" href="#view=latest" hidden>Latest Discussions</a>
 </header>
 
 <section class="wrap tl off" id="tl" aria-label="Timeline" hidden>
@@ -222,6 +269,7 @@ img{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 
 <div class="wrap status"><span id="count"></span><button class="clear" id="clear" hidden>Clear all filters</button></div>
 <main class="wrap" id="out"><p class="msg">Loading photos…</p></main>
+<section class="wrap" id="feed" aria-label="Latest discussions" hidden></section>
 <footer class="wrap" id="foot"></footer>
 <div class="gate" id="gate" hidden>
   <div class="owl" role="img" aria-label="Flying owl"></div>
@@ -289,7 +337,7 @@ const PROGS=["Senior High Camp","Junior High Camp","YPC","Other Youth Camps","Co
 const DECS=["1920s","1930s","1940s","1950s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
 const decOf=r=>{if(/^\d{4}/.test(r.date))return r.date.slice(0,3)+"0s";const m=(r.era||"").match(/^(\d{3})0s/i);return m?m[1]+"0s":""};
 const sub=r=>[r.date||r.era,r.coll].filter(Boolean).join(" - ");
-const st = {q:"", qf:"", sf:"date", sd:1, gf:"", yr:0, prog:new Set(), dec:new Set()};
+const st = {view:"", q:"", qf:"", sf:"date", sd:1, gf:"", yr:0, prog:new Set(), dec:new Set()};
 
 /* ---- data ---- */
 function parseCSV(t){const out=[];let row=[],c="",inq=false;
@@ -338,12 +386,15 @@ function applyList(out){
 
 /* ---- state in URL so views can be shared ---- */
 function readHash(){const p=new URLSearchParams(location.hash.slice(1));
-  st.q=p.get("q")||"";st.qf=SCOPES.some(x=>x[0]===p.get("in"))?p.get("in"):"";st.sf=p.get("sort")||"date";st.sd=p.get("dir")==="-1"?-1:1;st.gf=p.get("group")||"";st.yr=+(p.get("yr")||0)||0;if(TL&&(st.yr<TL.lo||st.yr>TL.hi))st.yr=0;
+  st.q=p.get("q")||"";st.qf=SCOPES.some(x=>x[0]===p.get("in"))?p.get("in"):"";st.sf=p.get("sort")||"date";st.sd=p.get("dir")==="-1"?-1:1;st.gf=p.get("group")||"";st.view=p.get("view")==="latest"?"latest":"";st.yr=+(p.get("yr")||0)||0;if(TL&&(st.yr<TL.lo||st.yr>TL.hi))st.yr=0;
   st.prog=new Set((p.get("prog")||"").split("|").filter(Boolean));st.dec=new Set((p.get("dec")||"").split("|").filter(Boolean))}
 function writeHash(){const p=new URLSearchParams();
   if(st.q)p.set("q",st.q);if(st.qf)p.set("in",st.qf);if(st.sf!=="date")p.set("sort",st.sf);if(st.sd===-1)p.set("dir","-1");
   if(st.gf)p.set("group",st.gf);if(st.yr)p.set("yr",st.yr);if(st.prog.size)p.set("prog",[...st.prog].join("|"));
   if(st.dec.size)p.set("dec",[...st.dec].join("|"));
+  const base=p.toString();   // the Latest Discussions button toggles between this view and the photo grid, keeping the filters
+  $("dlink").href=st.view?(base?"#"+base:"#"):"#"+(base?base+"&":"")+"view=latest";
+  if(st.view)p.set("view","latest");
   try{history.replaceState(null,"",p.toString()?"#"+p:location.pathname+location.search)}catch(e){}}
 
 /* ---- render ---- */
@@ -440,6 +491,7 @@ function render(quick){
     (g?`<h2>${esc(g)}<small>${items.length}</small></h2>`:"")+`<div class="grid">`+items.map((r,i)=>
     `<button class="tile" data-id="${r.id}" aria-label="${esc(r.title||"Photo")}"><img ${quick?`data-pending="${src(r,700)}"`:`src="${src(r,700)}"`} data-id="${r.img||""}" data-w="700" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer">${sub(r)?`<span><i>${esc(sub(r))}</i></span>`:""}</button>`).join("")+`</div>`).join("")
     :`<p class="msg">${st.yr&&!st.q&&!st.prog.size&&!st.dec.size?`No photos from ${st.yr} yet. Keep sliding.`:"No photos match these filters. Try removing a tag or clearing the search."}</p>`;
+  showView();
 }
 function start(){
   readHash();build();tlInit();
@@ -520,7 +572,7 @@ const setTestName=n=>{try{localStorage.setItem(TESTNAME_KEY,n)}catch(e){}};
 const myName=()=>ME.test?testName():ME.name;
 function idHTML(p){p=p||"sg";
   return `<p class="who">Posting as <b>${esc(myName()||(ME.test?"Test visitor":"you"))}</b> <button type="button" class="lnk" data-chname="1">Change</button></p>`}
-function refreshWho(){["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(b)b.innerHTML=idHTML(q)});footer()}
+function refreshWho(){["sg","dc","rp"].forEach(q=>{const b=$(q+"_id");if(b)b.innerHTML=idHTML(q)});document.querySelectorAll(".fdwho").forEach(b=>{b.innerHTML=idHTML()});footer()}
 function openNameBox(){
   $("nb_name").value=myName()||"";$("nb_msg").textContent="";
   $("nb_p").textContent=ME.test?"Optional. It labels anything you write while you're testing.":"This is how your name will show on your suggestions and comments. Your email address is never shown.";
@@ -563,9 +615,85 @@ ${pwSaved()?"":'<label for="dc_pw">Access code *</label><input type="password" i
 async function loadDiscussion(){if(!CONFIG.suggestApiUrl)return;
   try{const res=await fetch(CONFIG.suggestApiUrl,{method:"POST",body:JSON.stringify({action:"discussion",password:CODE})});
     const out=await res.json();if(!out.ok)throw 0;
-    const m={};(out.posts||[]).forEach(p=>(m[p.photo]=m[p.photo]||[]).push(p));DISC=m}
-  catch(e){DISC="err"}
-  const l=$("disc_list");if(l&&order[cur])l.innerHTML=discListHTML(order[cur])}
+    const m={};(out.posts||[]).forEach(p=>(m[p.photo]=m[p.photo]||[]).push(p));DISC=m;discAt=Date.now()}
+  catch(e){if(DISC===null)DISC="err"}
+  const l=$("disc_list");if(l&&order[cur])l.innerHTML=discListHTML(order[cur]);
+  if(st.view==="latest")renderFeed(true)}
+/* ---- Latest Discussions: one scrolling page, each conversation under its photo ---- */
+let discAt=0,feedN=8,feedList=[],feedExp=new Set(),feedOn=false,feedIO=null;
+const FEED_STEP=8;
+const ago=s=>{const t=new Date(s).getTime();if(isNaN(t))return "";const m=Math.floor((Date.now()-t)/60000);
+  if(m<1)return "just now";if(m<60)return m+" min ago";const h=Math.floor(m/60);if(h<24)return h+(h===1?" hour ago":" hours ago");
+  const d=Math.floor(h/24);return d<7?d+(d===1?" day ago":" days ago"):fmtDate(s)};
+function feedBuild(){
+  const by=new Map(rows.map(r=>[r.img,r])),D=DISC&&DISC!=="err"?DISC:{};
+  feedList=Object.keys(D).filter(k=>by.has(k)&&D[k].length).map(k=>({r:by.get(k),last:D[k].reduce((a,m)=>String(m.when)>a?String(m.when):a,"")}))
+    .sort((a,b)=>a.last<b.last?1:a.last>b.last?-1:0)}
+const fMsg=(m,cls)=>`<div class="fm${cls}"><span class="av" aria-hidden="true">${esc((String(m.name||"?").trim()[0]||"?").toUpperCase())}</span><div><div class="bub"><b>${esc(m.name||"Anonymous")}</b><p>${esc(m.text)}</p></div><div class="fmeta"><span>${esc(ago(m.when))}</span>${cls?"":`<button type="button" class="lnk" data-freply="${esc(m.id)}">Reply</button>`}</div></div></div>`;
+function feedCard(e){
+  const r=e.r,L=DISC[r.img]||[],tops=L.filter(m=>!m.replyTo),kids=id=>L.filter(m=>m.replyTo===id),
+    shown=feedExp.has(r.img)?tops:tops.slice(-3),hid=tops.length-shown.length,t=esc(r.title||"Untitled photo"),im=esc(r.img);
+  return `<article class="fc" data-img="${im}"><header class="fch"><h3><button type="button" data-open="${im}">${t}</button></h3>${sub(r)?`<p>${esc(sub(r))}</p>`:""}</header>
+<button type="button" class="fpic" data-open="${im}" aria-label="Open ${t} with its details"><img src="${src(r,1000)}" data-id="${im}" data-w="1000" onerror="fb(this)" alt="" loading="lazy" referrerpolicy="no-referrer"></button>
+<div class="fbar"><span>${L.length} ${L.length===1?"comment":"comments"}</span><button type="button" data-open="${im}">View photo details</button></div>
+<div class="fth">${hid?`<button type="button" class="lnk" data-fmore="${im}">View ${hid} earlier ${hid===1?"conversation":"conversations"}</button>`:""}${shown.map(m=>{const k=kids(m.id);
+  return `<div class="fth1" data-id="${esc(m.id)}">${fMsg(m,"")}${k.map(x=>fMsg(x," reply")).join("")}<div class="rpslot"></div></div>`}).join("")}</div>
+<form class="ffm" data-photo="${im}" novalidate><div class="row"><textarea name="text" rows="1" placeholder="Write a comment…" aria-label="Write a comment on ${t}"></textarea><button type="submit">Post</button></div>
+<input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true"><div class="fdwho">${idHTML()}</div><p class="sgm" role="status"></p></form></article>`}
+function feedCardRefresh(img){const a=[...$("feed").querySelectorAll(".fc")].find(x=>x.dataset.img===img),e=feedList.find(x=>x.r.img===img);
+  if(a&&e){const t=document.createElement("div");t.innerHTML=feedCard(e);a.replaceWith(t.firstElementChild)}}
+function renderFeed(keep){
+  const f=$("feed");if(!keep)feedN=FEED_STEP;
+  let h=`<div class="fhead"><h2>Latest discussions</h2><button type="button" class="lnk" id="frefresh">Refresh</button><p>Photos with recent conversations, newest first. Add to a conversation below any photo, or open the photo to see all its details.</p></div>`;
+  if(feedIO){feedIO.disconnect();feedIO=null}
+  if(DISC===null)h+='<p class="fnone">Loading the discussions…</p>';
+  else if(DISC==="err")h+='<p class="fnone">The discussions couldn\'t be loaded right now. <button type="button" class="lnk" id="fretry">Try again</button></p>';
+  else{feedBuild();
+    if(!feedList.length)h+='<p class="fnone">No conversations yet. Open any photo and start one.</p>';
+    else h+=`<div id="fcards">${feedList.slice(0,feedN).map(feedCard).join("")}</div><div id="fsent"></div><p class="fend" id="fend"></p>`}
+  f.innerHTML=h;feedEnd()}
+function feedEnd(){const s=$("fsent"),n=$("fend");if(!s)return;
+  if(feedN>=feedList.length){n.textContent=feedList.length>FEED_STEP?"That's everything.":"";return}
+  n.innerHTML='<button type="button" class="lnk" id="fmore">Show more</button>';
+  if("IntersectionObserver" in window){feedIO=new IntersectionObserver(es=>{if(es.some(x=>x.isIntersecting))feedMore()},{rootMargin:"700px"});feedIO.observe(s)}}
+function feedMore(){if(feedN>=feedList.length)return;const a=feedN;feedN=Math.min(feedList.length,feedN+FEED_STEP);
+  $("fcards").insertAdjacentHTML("beforeend",feedList.slice(a,feedN).map(feedCard).join(""));
+  if(feedIO){feedIO.disconnect();feedIO=null}feedEnd()}
+function showView(){
+  const on=st.view==="latest"&&!!CONFIG.suggestApiUrl;
+  $("dlink").hidden=!CONFIG.suggestApiUrl;$("dlink").textContent=on?"Back to photos":"Latest Discussions";
+  document.body.classList.toggle("vlatest",on);$("feed").hidden=!on;
+  if(on===feedOn)return;
+  feedOn=on;window.scrollTo(0,0);
+  if(on){renderFeed();if(Date.now()-discAt>120000&&DISC!==null)loadDiscussion()}
+  else if(feedIO){feedIO.disconnect();feedIO=null}}
+function openFromFeed(img){const i=feedList.findIndex(e=>e.r.img===img);if(i<0)return;
+  const saved=order;order=feedList.map(e=>e.r);openViewer(i);$("lb").showModal();
+  $("lb").addEventListener("close",()=>{order=saved;if(st.view==="latest")renderFeed(true)},{once:true})}
+$("feed").addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("button");if(!b)return;
+  if(b.dataset.open){openFromFeed(b.dataset.open);return}
+  if(b.dataset.fmore){feedExp.add(b.dataset.fmore);feedCardRefresh(b.dataset.fmore);return}
+  if(b.dataset.chname){openNameBox();return}
+  if(b.id==="fmore"){feedMore();return}
+  if(b.id==="frefresh"||b.id==="fretry"){if(b.id==="fretry")DISC=null;loadDiscussion();return}
+  if(b.dataset.freply){const th=b.closest(".fth1"),sl=th.querySelector(".rpslot"),img=b.closest(".fc").dataset.img;
+    $("feed").querySelectorAll(".rpslot").forEach(x=>{x.innerHTML=""});
+    sl.innerHTML=`<form class="ffm rpf" data-photo="${esc(img)}" data-parent="${esc(b.dataset.freply)}" novalidate><div class="row"><textarea name="text" rows="1" placeholder="Write a reply…" aria-label="Write a reply"></textarea><button type="submit">Reply</button></div><input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true"><div class="fdwho">${idHTML()}</div><p class="sgm" role="status"></p><button type="button" class="lnk" data-rcancel="1">Cancel</button></form>`;
+    sl.querySelector("textarea").focus();return}
+  if(b.dataset.rcancel){b.closest(".rpslot").innerHTML=""}});
+$("feed").addEventListener("submit",async e=>{const f=e.target;if(!f.classList||!f.classList.contains("ffm"))return;
+  e.preventDefault();
+  const img=f.dataset.photo,msg=f.querySelector(".sgm"),btn=f.querySelector("button[type=submit]"),v=n=>f.elements[n]?f.elements[n].value.trim():"";
+  if(v("website"))return;
+  const d={photoId:img,name:ME.test?testName():"",text:v("text")};if(f.dataset.parent)d.replyTo=f.dataset.parent;
+  if(!d.text){msg.textContent="Please write a message first.";return}
+  if(!CODE){msg.textContent="Please sign in again.";return}
+  btn.disabled=true;msg.textContent="Posting…";
+  try{const out=await api("discuss",{password:CODE,discussion:d});
+    if(out.approved&&out.post){if(!DISC||DISC==="err")DISC={};(DISC[img]=DISC[img]||[]).push(out.post);feedCardRefresh(img);return}
+    f.elements.text.value="";msg.textContent=f.dataset.parent?"Thank you! Your reply will appear after it has been reviewed.":"Thank you! Your comment will appear after it has been reviewed."}
+  catch(err){msg.textContent=err.message}
+  btn.disabled=false});
 function suggestHTML(r){if(!CONFIG.suggestApiUrl||!r.img)return "";
   const cur=r.date||r.era||"",progs=(!r.coll||PROGS.includes(r.coll))?PROGS:PROGS.concat(r.coll);
   const f=(k,l,v,ph)=>`<label for="sg_${k}">${l}</label><input type="text" id="sg_${k}" name="${k}" value="${esc(v)}" data-orig="${esc(v)}" placeholder="${esc(ph||"")}" autocomplete="off">`;
