@@ -112,9 +112,12 @@ ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
     <label for="program">Program <span class="opt">(if known or applicable)</span></label>
     <select id="program"><option value="">Not sure or not applicable</option></select>
 
+    <label for="by">Photographer <span class="opt">(if known)</span></label>
+    <input type="text" id="by" placeholder="First Last">
+
     <label for="people">People in the photo <span class="opt">(if known)</span></label>
     <input type="text" id="people" placeholder="First Last, First Last">
-    <p class="hint">Separate names with commas.</p>
+    <p class="hint">Separate names with commas. Names already in the archive are suggested as you type.</p>
 
     <label for="tags">Other tags <span class="opt">(optional)</span></label>
     <input type="text" id="tags" placeholder="canoeing, chapel, dinner">
@@ -152,16 +155,16 @@ const MAX_SIDE = 2800;   // photos are shrunk to this many pixels on the longest
 const $ = id => document.getElementById(id);
 
 /* ---- keyword suggestions: type freely, or pick from tags already in the archive ---- */
-function tagSuggest(inp,pool){
+function tagSuggest(inp,pool,single){
   const wrap=document.createElement("div");wrap.className="ac";
   inp.parentNode.insertBefore(wrap,inp);wrap.appendChild(inp);
   const ul=document.createElement("ul");ul.className="acl";ul.id=(inp.id||"tg"+Math.random().toString(36).slice(2))+"_list";ul.setAttribute("role","listbox");ul.hidden=true;wrap.appendChild(ul);
   inp.setAttribute("role","combobox");inp.setAttribute("aria-autocomplete","list");inp.setAttribute("aria-expanded","false");inp.setAttribute("aria-controls",ul.id);inp.autocomplete="off";
   let items=[],sel=-1;
-  const split=()=>{const v=inp.value,i=v.lastIndexOf(",");return{head:v.slice(0,i+1),cur:v.slice(i+1).trim()}};
+  const split=()=>{const v=inp.value,i=single?-1:v.lastIndexOf(",");return{head:v.slice(0,i+1),cur:v.slice(i+1).trim()}};
   const close=()=>{ul.hidden=true;inp.setAttribute("aria-expanded","false");sel=-1};
   const mark=()=>{[...ul.children].forEach((li,i)=>{li.setAttribute("aria-selected",i===sel);if(i===sel)li.scrollIntoView({block:"nearest"})})};
-  const pick=t=>{const{head}=split();inp.value=(head?head.replace(/\s*$/," "):"")+t+", ";close();inp.focus();inp.dispatchEvent(new Event("input",{bubbles:true}))};
+  const pick=t=>{const{head}=split();inp.value=single?t:(head?head.replace(/\s*$/," "):"")+t+", ";close();inp.focus();inp.dispatchEvent(new Event("input",{bubbles:true}))};
   const show=()=>{const{head,cur}=split(),q=cur.toLowerCase();
     if(!q){close();return}
     const have=new Set(head.split(",").map(x=>x.trim().toLowerCase()).filter(Boolean));
@@ -213,7 +216,7 @@ function fpLoad(src) { return new Promise((res, rej) => { const im = new Image()
 async function fpOfFile(file) { const url = URL.createObjectURL(file); try { return fpFromImage(await fpLoad(url)); } finally { URL.revokeObjectURL(url); } }
 
 let EXISTING=[];   // photos already in the archive: { h: fingerprint, id, label }
-let TAGPOOL=[];
+let TAGPOOL=[], NAMEPOOL=[];
 async function loadTags(){
   try{const out=await api("list",{password:PW,view:"upload"});
     const t=[out.head||[]].concat(out.rows||[]),head=t[0].map(h=>h.trim().toLowerCase()),ti=head.indexOf("tags"),si=head.indexOf("status");
@@ -221,6 +224,10 @@ async function loadTags(){
      if(hi>=0&&li>=0)EXISTING=t.slice(1).map(r=>({h:String(r[hi]||"").trim().toLowerCase(),id:(String(r[li]||"").match(/[-\w]{25,}/)||[""])[0],
        label:String(r[ni]||"").trim()||String(r[fi]||"").trim()||"a photo in the archive"})).filter(x=>fpValid(x.h)&&x.id);
      queue.forEach(checkAgainstArchive);rerender()}
+    {const pi=head.indexOf("people"),bi=head.indexOf("photographer"),nc=new Map();
+     t.slice(1).forEach(r=>{if(si>=0&&(r[si]||"").trim().toLowerCase()!=="approved")return;
+       [pi,bi].forEach(ix=>{if(ix<0)return;String(r[ix]||"").split(/[,;]/).forEach(x=>{x=x.trim().replace(/\s+/g," ");if(x.length<2)return;const k=x.toLowerCase(),e=nc.get(k)||{n:0,f:{}};e.n++;e.f[x]=(e.f[x]||0)+1;nc.set(k,e)})})});
+     NAMEPOOL=[...nc.values()].sort((a,b)=>b.n-a.n).map(e=>Object.entries(e.f).sort((a,b)=>b[1]-a[1])[0][0])}
     if(ti<0)return;const c=new Map();
     t.slice(1).forEach(r=>{if(si>=0&&(r[si]||"").trim().toLowerCase()!=="approved")return;
       String(r[ti]||"").split(",").forEach(x=>{x=x.trim();if(!x)return;const k=x.toLowerCase(),e=c.get(k)||{n:0,f:{}};e.n++;e.f[x]=(e.f[x]||0)+1;c.set(k,e)})});
@@ -255,6 +262,8 @@ async function api(action, payload) {
 }
 
 tagSuggest($("tags"), () => TAGPOOL);
+tagSuggest($("people"), () => NAMEPOOL);
+tagSuggest($("by"), () => NAMEPOOL, true);
 PROGRAMS.forEach(p => { const o = document.createElement("option"); o.value = o.textContent = p; $("program").appendChild(o); });
 
 const CODE_KEY = "rowe-code";   // the same code the archive page remembers, so members only sign in once
@@ -277,18 +286,18 @@ try { const saved = localStorage.getItem(CODE_KEY); if (saved) enter(saved, true
 $("files").onchange = e => {
   for (const f of e.target.files) {
     if (queue.length >= MAX_FILES) { $("status").textContent = "You can send up to " + MAX_FILES + " photos at a time."; break; }
-    if (f.type.startsWith("image/")) { const it = { file: f, title: "", date: "", program: "", people: "", tags: "", comments: "", open: false, hash: undefined, dup: null, keep: false };
+    if (f.type.startsWith("image/")) { const it = { file: f, title: "", date: "", program: "", by: "", people: "", tags: "", comments: "", open: false, hash: undefined, dup: null, keep: false };
       it.hashP = fpOfFile(f).catch(() => "").then(h => { it.hash = h; checkAgainstArchive(it); rerender(); return h; });
       queue.push(it); }
   }
   e.target.value = ""; render();
 };
-const DETAIL_KEYS = ["title", "date", "program", "people", "tags", "comments"];
+const DETAIL_KEYS = ["title", "date", "program", "by", "people", "tags", "comments"];
 function sharedGet() { const o = {}; DETAIL_KEYS.forEach(k => { o[k] = $(k).value; }); return o; }
 function sharedSet(o) { DETAIL_KEYS.forEach(k => { $(k).value = o[k] || ""; }); }
 
 // Copies one photo's details (everything except the title) onto every other photo
-const COPY_KEYS = ["date", "program", "people", "tags", "comments"];
+const COPY_KEYS = ["date", "program", "by", "people", "tags", "comments"];
 function copyToAll(src) {
   const others = queue.filter(x => x !== src);
   if (!others.length) return;
@@ -318,7 +327,7 @@ function render() {
     if (multi) {
       const pf = document.createElement("div"); pf.className = "pf";
       [["title", "Title (optional)", "input"], ["date", "Date or era (if known)", "input"], ["program", "Program (if known)", "select"],
-       ["tags", "Other tags", "input"], ["people", "People in the photo (if known)", "input", "full"], ["comments", "Description", "textarea", "full"]
+       ["by", "Photographer (if known)", "input"], ["tags", "Other tags", "input"], ["people", "People in the photo (if known)", "input", "full"], ["comments", "Description", "textarea", "full"]
       ].forEach(([k, label, tag, cls]) => {
         const w = document.createElement("div"); w.className = "fw" + (cls ? " " + cls : "");
         const id = "pp" + i + k, lb = document.createElement("label"); lb.htmlFor = id; lb.textContent = label;
@@ -326,7 +335,7 @@ function render() {
         if (tag === "select") { fld.add(new Option("Not sure or not applicable", "")); PROGRAMS.forEach(p => fld.add(new Option(p, p))); }
         fld.value = it[k];
         fld.oninput = fld.onchange = () => { it[k] = fld.value; };
-        w.append(lb, fld); if (k === "tags") tagSuggest(fld, () => TAGPOOL); pf.appendChild(w);
+        w.append(lb, fld); if (k === "tags") tagSuggest(fld, () => TAGPOOL); else if (k === "people") tagSuggest(fld, () => NAMEPOOL); else if (k === "by") tagSuggest(fld, () => NAMEPOOL, true); pf.appendChild(w);
       });
       body.appendChild(pf);
       const cp = document.createElement("button"); cp.type = "button"; cp.className = "btn alt cp";
@@ -380,7 +389,7 @@ function perPhoto(base, it, multi) {
   if (!multi) return base;
   const t = k => String(it[k] || "").trim();
   return { name: base.name, email: base.email, rights: base.rights,
-           title: t("title"), date: t("date"), program: t("program"), people: t("people"), tags: normTags(t("tags")), comments: t("comments") };
+           title: t("title"), date: t("date"), program: t("program"), by: t("by"), people: t("people"), tags: normTags(t("tags")), comments: t("comments") };
 }
 
 $("main").onsubmit = async e => {
@@ -390,7 +399,7 @@ $("main").onsubmit = async e => {
   await Promise.all(queue.map(q => q.hashP));
   const unresolved = queue.filter((q, k) => !q.keep && (q.dup || queue.some((o, j) => j < k && q.hash && o.hash && fpDist(q.hash, o.hash) <= FP_MAX_DIFF)));
   if (unresolved.length) { st.className = "msg err"; st.textContent = unresolved.length === 1 ? "One photo looks like a duplicate. Please choose \u201cDon\u2019t send this one\u201d or \u201cIt\u2019s different, send it\u201d on that photo." : unresolved.length + " photos look like duplicates. Please choose what to do with each one marked above."; return; }
-  const meta = { name: $("name").value, email: $("email").value, date: $("date").value, program: $("program").value,
+  const meta = { name: $("name").value, email: $("email").value, date: $("date").value, program: $("program").value, by: $("by").value,
     people: $("people").value, tags: normTags($("tags").value), comments: $("comments").value, title: $("title").value, rights: $("rights").checked };
   $("send").disabled = true;
   const total = queue.length, multi = total > 1; let done = 0;
